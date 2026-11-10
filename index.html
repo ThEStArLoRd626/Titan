@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Titan — Fan Web Edition (play with anyone)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';document.head.appendChild(s)"></script>
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js';document.head.appendChild(s)"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -147,7 +148,7 @@ function rnd(n){return 1+Math.floor(Math.random()*n)}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 
 /* ================= MASTERBOARD ================= */
-const BOARD=[["Swamp",225.0,324.3,1,"38",[[3,4]]],["Plains",225.0,381.3,0,"46",[[0,4]]],["Brush",273.9,238.8,1,"26",[[7,4]]],["Marsh",273.9,295.8,0,"31",[[2,4],[8,2]]],["Brush",273.9,409.8,1,"54",[[1,4],[9,2]]],["Jungle",273.9,466.8,0,"61",[[4,4]]],["Desert",322.9,153.3,1,"14",[[13,4]]],["Plains",322.9,210.3,0,"20",[[6,4],[14,2]]],["Hills",322.9,324.3,1,"39",[[3,1],[9,4]]],["Jungle",322.9,381.3,0,"47",[[4,1],[16,4]]],["Marsh",322.9,495.3,1,"66",[[5,4],[17,2]]],["Brush",322.9,552.3,0,"72",[[10,4]]],["Marsh",371.9,67.8,1,"5",[[20,4]]],["Brush",371.9,124.8,0,"10",[[12,4],[21,2]]],["Tower",371.9,238.8,1,"200",[[7,3],[15,3],[22,3]]],["Brush",371.9,295.8,0,"32",[[8,4],[14,2]]],["Plains",371.9,409.8,1,"55",[[17,2],[24,4]]],["Tower",371.9,466.8,0,"400",[[10,3],[16,3],[25,3]]],["Plains",371.9,580.8,1,"78",[[11,4],[26,2]]],["Desert",371.9,637.8,0,"82",[[18,4]]],["Jungle",420.8,39.3,0,"1",[[28,4]]],["Jungle",420.8,153.3,1,"15",[[13,1],[22,4]]],["Marsh",420.8,210.3,0,"21",[[14,2],[30,4]]],["Woods",420.8,324.3,1,"40",[[15,4],[24,2]]],["Desert",420.8,381.3,0,"48",[[23,2],[32,4]]],["Brush",420.8,495.3,1,"67",[[17,2],[26,4]]],["Woods",420.8,552.3,0,"73",[[18,2],[34,4]]],["Marsh",420.8,666.3,1,"87",[[19,4]]],["Plains",469.8,67.8,1,"6",[[29,2],[36,4]]],["Woods",469.8,124.8,0,"11",[[21,4],[28,2]]],["Swamp",469.8,238.8,1,"27",[[31,4],[38,2]]],["Plains",469.8,295.8,0,"33",[[23,4],[39,2]]],["Marsh",469.8,409.8,1,"56",[[33,4],[40,2]]],["Hills",469.8,466.8,0,"62",[[25,4],[41,2]]],["Jungle",469.8,580.8,1,"79",[[35,1],[42,4]]],["Brush",469.8,637.8,0,"83",[[27,4],[34,2]]],["Brush",518.7,39.3,0,"2",[[44,4]]],["Brush",518.7,153.3,1,"16",[[29,4],[45,2]]],["Hills",518.7,210.3,0,"22",[[30,2],[37,4]]],["Mountains",518.7,324.3,1,"41",[[31,1],[40,3]]],["Tundra",518.7,381.3,0,"49",[[32,1],[39,3],[48,3]]],["Swamp",518.7,495.3,1,"68",[[33,2],[49,4]]],["Marsh",518.7,552.3,0,"74",[[41,4],[50,2]]],["Swamp",518.7,666.3,1,"88",[[35,4]]],["Marsh",567.7,67.8,1,"7",[[45,2],[52,4]]],["Tower",567.7,124.8,0,"100",[[37,3],[44,3],[53,3]]],["Marsh",567.7,238.8,1,"28",[[38,4],[47,2]]],["Tundra",567.7,295.8,0,"34",[[39,3],[46,1],[55,3]]],["Mountains",567.7,409.8,1,"57",[[40,3],[49,2],[56,3]]],["Plains",567.7,466.8,0,"63",[[48,2],[57,4]]],["Tower",567.7,580.8,1,"600",[[42,3],[51,3],[58,3]]],["Plains",567.7,637.8,0,"84",[[43,4],[50,2]]],["Swamp",616.6,39.3,0,"3",[[60,4]]],["Plains",616.6,153.3,1,"17",[[45,2],[54,4]]],["Desert",616.6,210.3,0,"23",[[46,4],[62,2]]],["Mountains",616.6,324.3,1,"42",[[56,3],[63,1]]],["Tundra",616.6,381.3,0,"50",[[48,3],[55,3],[64,1]]],["Woods",616.6,495.3,1,"69",[[58,4],[65,2]]],["Brush",616.6,552.3,0,"75",[[50,2],[66,4]]],["Brush",616.6,666.3,1,"89",[[51,4]]],["Brush",665.5,67.8,1,"8",[[61,2],[68,4]]],["Jungle",665.5,124.8,0,"12",[[53,4],[60,1]]],["Woods",665.5,238.8,1,"29",[[54,2],[70,4]]],["Plains",665.5,295.8,0,"35",[[55,2],[62,4]]],["Marsh",665.5,409.8,1,"58",[[56,2],[72,4]]],["Desert",665.5,466.8,0,"64",[[57,2],[64,4]]],["Hills",665.5,580.8,1,"80",[[67,1],[74,4]]],["Marsh",665.5,637.8,0,"85",[[59,4],[66,1]]],["Plains",714.5,39.3,0,"4",[[76,4]]],["Hills",714.5,153.3,1,"18",[[61,4],[77,1]]],["Brush",714.5,210.3,0,"24",[[69,4],[78,2]]],["Swamp",714.5,324.3,1,"43",[[63,4],[72,2]]],["Hills",714.5,381.3,0,"51",[[71,3],[80,4]]],["Plains",714.5,495.3,1,"70",[[65,4],[81,2]]],["Jungle",714.5,552.3,0,"76",[[73,4],[82,1]]],["Jungle",714.5,666.3,1,"90",[[67,4]]],["Desert",763.5,67.8,1,"9",[[77,4]]],["Marsh",763.5,124.8,0,"13",[[69,2],[84,4]]],["Tower",763.5,238.8,1,"300",[[70,3],[79,3],[85,3]]],["Marsh",763.5,295.8,0,"36",[[71,4],[78,2]]],["Brush",763.5,409.8,1,"59",[[81,2],[87,4]]],["Tower",763.5,466.8,0,"500",[[73,3],[80,3],[88,3]]],["Brush",763.5,580.8,1,"81",[[74,2],[83,4]]],["Plains",763.5,637.8,0,"86",[[75,4]]],["Brush",812.4,153.3,1,"19",[[85,4]]],["Plains",812.4,210.3,0,"25",[[78,2],[90,4]]],["Jungle",812.4,324.3,1,"44",[[79,4],[91,2]]],["Woods",812.4,381.3,0,"52",[[86,4],[92,2]]],["Marsh",812.4,495.3,1,"71",[[81,2],[89,4]]],["Desert",812.4,552.3,0,"77",[[82,4]]],["Jungle",861.4,238.8,1,"30",[[91,4]]],["Brush",861.4,295.8,0,"37",[[86,2],[94,4]]],["Plains",861.4,409.8,1,"60",[[87,2],[93,4]]],["Brush",861.4,466.8,0,"65",[[88,4]]],["Marsh",910.3,324.3,1,"45",[[95,4]]],["Swamp",910.3,381.3,0,"53",[[92,4]]]];
+const BOARD=[["Swamp",225.0,324.3,1,"38",[[3,4]]],["Marsh",225.0,381.3,0,"46",[[0,4]]],["Brush",273.9,238.8,1,"26",[[7,4]]],["Plains",273.9,295.8,0,"31",[[2,4],[8,2]]],["Brush",273.9,409.8,1,"54",[[1,4],[9,2]]],["Jungle",273.9,466.8,0,"61",[[4,4]]],["Desert",322.9,153.3,1,"14",[[13,4]]],["Marsh",322.9,210.3,0,"20",[[6,4],[14,2]]],["Woods",322.9,324.3,1,"39",[[3,1],[9,4]]],["Jungle",322.9,381.3,0,"47",[[4,1],[16,4]]],["Plains",322.9,495.3,1,"66",[[5,4],[17,2]]],["Brush",322.9,552.3,0,"72",[[10,4]]],["Plains",371.9,67.8,1,"5",[[20,4]]],["Brush",371.9,124.8,0,"10",[[12,4],[21,2]]],["Tower",371.9,238.8,1,"200",[[7,3],[15,3],[22,3]]],["Brush",371.9,295.8,0,"32",[[8,4],[14,2]]],["Marsh",371.9,409.8,1,"55",[[17,2],[24,4]]],["Tower",371.9,466.8,0,"400",[[10,3],[16,3],[25,3]]],["Marsh",371.9,580.8,1,"78",[[11,4],[26,2]]],["Desert",371.9,637.8,0,"82",[[18,4]]],["Jungle",420.8,39.3,0,"1",[[28,4]]],["Jungle",420.8,153.3,1,"15",[[13,1],[22,4]]],["Plains",420.8,210.3,0,"21",[[14,2],[30,4]]],["Hills",420.8,324.3,1,"40",[[15,4],[24,2]]],["Swamp",420.8,381.3,0,"48",[[23,2],[32,4]]],["Brush",420.8,495.3,1,"67",[[17,2],[26,4]]],["Hills",420.8,552.3,0,"73",[[18,1],[34,4]]],["Plains",420.8,666.3,1,"87",[[19,4]]],["Marsh",469.8,67.8,1,"6",[[29,2],[36,4]]],["Hills",469.8,124.8,0,"11",[[21,4],[28,1]]],["Desert",469.8,238.8,1,"27",[[31,4],[38,2]]],["Marsh",469.8,295.8,0,"33",[[23,4],[39,2]]],["Plains",469.8,409.8,1,"56",[[33,4],[40,2]]],["Woods",469.8,466.8,0,"62",[[25,4],[41,2]]],["Jungle",469.8,580.8,1,"79",[[35,1],[42,4]]],["Brush",469.8,637.8,0,"83",[[27,4],[34,2]]],["Brush",518.7,39.3,0,"2",[[44,4]]],["Brush",518.7,153.3,1,"16",[[29,4],[45,2]]],["Woods",518.7,210.3,0,"22",[[30,2],[37,4]]],["Tundra",518.7,324.3,1,"41",[[31,1],[40,3],[47,3]]],["Mountains",518.7,381.3,0,"49",[[32,1],[39,3],[48,3]]],["Desert",518.7,495.3,1,"68",[[33,2],[49,4]]],["Plains",518.7,552.3,0,"74",[[41,4],[50,2]]],["Swamp",518.7,666.3,1,"88",[[35,4]]],["Plains",567.7,67.8,1,"7",[[45,2],[52,4]]],["Tower",567.7,124.8,0,"100",[[37,3],[44,3],[53,3]]],["Plains",567.7,238.8,1,"28",[[38,4],[47,2]]],["Mountains",567.7,295.8,0,"34",[[39,3],[46,1],[55,3]]],["Tundra",567.7,409.8,1,"57",[[40,3],[49,1],[56,3]]],["Marsh",567.7,466.8,0,"63",[[48,2],[57,4]]],["Tower",567.7,580.8,1,"600",[[42,3],[51,3],[58,3]]],["Marsh",567.7,637.8,0,"84",[[43,4],[50,2]]],["Swamp",616.6,39.3,0,"3",[[60,4]]],["Marsh",616.6,153.3,1,"17",[[45,2],[54,4]]],["Swamp",616.6,210.3,0,"23",[[46,4],[62,2]]],["Tundra",616.6,324.3,1,"42",[[47,3],[56,3],[63,1]]],["Mountains",616.6,381.3,0,"50",[[48,3],[55,3],[64,1]]],["Hills",616.6,495.3,1,"69",[[58,4],[65,2]]],["Brush",616.6,552.3,0,"75",[[50,2],[66,4]]],["Brush",616.6,666.3,1,"89",[[51,4]]],["Brush",665.5,67.8,1,"8",[[61,2],[68,4]]],["Jungle",665.5,124.8,0,"12",[[53,4],[60,1]]],["Hills",665.5,238.8,1,"29",[[54,2],[70,4]]],["Marsh",665.5,295.8,0,"35",[[55,2],[62,4]]],["Plains",665.5,409.8,1,"58",[[56,2],[72,4]]],["Swamp",665.5,466.8,0,"64",[[57,2],[64,4]]],["Woods",665.5,580.8,1,"80",[[67,1],[74,4]]],["Plains",665.5,637.8,0,"85",[[59,4],[66,2]]],["Marsh",714.5,39.3,0,"4",[[76,4]]],["Woods",714.5,153.3,1,"18",[[61,4],[77,1]]],["Brush",714.5,210.3,0,"24",[[69,4],[78,2]]],["Desert",714.5,324.3,1,"43",[[63,4],[72,2]]],["Woods",714.5,381.3,0,"51",[[71,2],[80,4]]],["Marsh",714.5,495.3,1,"70",[[65,4],[81,2]]],["Jungle",714.5,552.3,0,"76",[[73,4],[82,1]]],["Jungle",714.5,666.3,1,"90",[[67,4]]],["Desert",763.5,67.8,1,"9",[[77,4]]],["Plains",763.5,124.8,0,"13",[[69,2],[84,4]]],["Tower",763.5,238.8,1,"300",[[70,3],[79,3],[85,3]]],["Plains",763.5,295.8,0,"36",[[71,4],[78,2]]],["Brush",763.5,409.8,1,"59",[[81,2],[87,4]]],["Tower",763.5,466.8,0,"500",[[73,3],[80,3],[88,3]]],["Brush",763.5,580.8,1,"81",[[74,2],[83,4]]],["Marsh",763.5,637.8,0,"86",[[75,4]]],["Brush",812.4,153.3,1,"19",[[85,4]]],["Marsh",812.4,210.3,0,"25",[[78,2],[90,4]]],["Jungle",812.4,324.3,1,"44",[[79,4],[91,1]]],["Hills",812.4,381.3,0,"52",[[86,4],[92,1]]],["Plains",812.4,495.3,1,"71",[[81,2],[89,4]]],["Desert",812.4,552.3,0,"77",[[82,4]]],["Jungle",861.4,238.8,1,"30",[[91,4]]],["Brush",861.4,295.8,0,"37",[[86,2],[94,4]]],["Marsh",861.4,409.8,1,"60",[[87,2],[93,4]]],["Brush",861.4,466.8,0,"65",[[88,4]]],["Plains",910.3,324.3,1,"45",[[95,4]]],["Swamp",910.3,381.3,0,"53",[[92,4]]]];
 // Each land: [terrain, x, y, pointsUp, label, exits[[toIndex, type]]]  type: 4=arrows 3=arrow 2=arch 1=block
 const LANDS={}, LAND_IDS=[], TOWERS=[];
 BOARD.forEach(([terrain,x,y,up,label,ex],i)=>{const id='L'+i;LANDS[id]={id,terrain,x,y,up:!!up,label,exits:ex.map(([t,k])=>['L'+t,k])};LAND_IDS.push(id);if(terrain==='Tower')TOWERS.push(id)});
@@ -308,9 +309,11 @@ function moveTargets(S,lid){
   // Every later step must follow an arrow or arrows.
   (function dfs(land,steps,first,seen){
     if(steps===0){if(!own(land)&&land!==L.land)out[land]={tele:false};return}
+    // Board legend: starting, a block MUST be used (else any circle, arrow or triple arrows);
+    // continuing, triple arrows MUST be followed if the land has them, otherwise a single arrow (no backtracking).
     let ex=LANDS[land].exits;
     if(first){const bl=ex.filter(e=>e[1]===1);ex=bl.length?bl:ex.filter(e=>e[1]>=2)}
-    else ex=ex.filter(e=>e[1]>=3);
+    else{const tri=ex.filter(e=>e[1]===4);ex=tri.length?tri:ex.filter(e=>e[1]===3)}
     for(const [n] of ex){
       if(seen.has(n))continue;
       if(enemy(n)){if(steps===1&&!own(n))out[n]={tele:false};continue}
@@ -704,8 +707,8 @@ function exitMark(fromId,toId,type){
   if(type===4)return `<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})" pointer-events="none"><rect x="-5" y="-14" width="10" height="28" rx="2" fill="#120c08"/>${[-8.5,0,8.5].map(o=>`<g transform="translate(0,${o})">${tri}</g>`).join('')}</g>`;
   // single marks sit at this land's end of the border
   const side=fromId<toId?1:-1;
-  const sym=type===3?tri:type===2?'<path d="M-3,3V0A3,3 0 0 1 3,0V3" fill="none" stroke="#f4eee0" stroke-width="1.6" transform="rotate(90)"/>':'<rect x="-2.6" y="-2.6" width="5.2" height="5.2" fill="#f4eee0"/>';
-  return `<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)}) translate(0,${(side*13).toFixed(1)})" pointer-events="none"><rect x="-5.5" y="-5.5" width="11" height="11" rx="2" fill="#120c08"/>${sym}</g>`;
+  const sym=type===3?tri:type===2?'<circle r="2.9" fill="#f4eee0"/>':'<rect x="-1.6" y="-3.6" width="3.2" height="7.2" fill="#f4eee0"/>';
+  return `<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)}) translate(3,${(side*12).toFixed(1)})" pointer-events="none"><rect x="-5.5" y="-5.5" width="11" height="11" rx="2" fill="#120c08" stroke="#5a4632" stroke-width=".6"/>${sym}</g>`;
 }
 
 /* ================= APP STATE ================= */
@@ -727,18 +730,50 @@ async function loadNames(uids){
   try{const ps=await user.profiles(need);need.forEach(u=>names[u]=(ps&&ps[u]&&ps[u].name)||'');render()}catch(e){}
 }
 
-/* ---------- peer-to-peer online play (no accounts) ----------
-   The host's browser keeps the authoritative game. Others connect to it with a room code
-   through the free PeerJS relay; every move is sent to the host, checked against the
-   current version, and broadcast back to everyone. */
-const PREFIX='titan-fanweb-v1-';
-let peer=null,conns=[],hostConn=null,isHost=false,room=null,retryT=null,pending=null;
+/* ---------- online play (no accounts) ----------
+   The host's browser keeps the authoritative game. Messages travel two ways at once:
+   (1) a direct browser-to-browser link (PeerJS, with public TURN relays), and
+   (2) a public MQTT message relay over secure websockets, which gets through networks that block direct links.
+   Every message carries an id so duplicates arriving by both routes are ignored. */
+const PREFIX='titan-fanweb-v1-',TOPIC='titanfw-v1/';
+const BROKERS=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
+const ICE={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},
+  {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},
+  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]};
+let peer=null,conns=[],hostConn=null,isHost=false,room=null,retryT=null,pending=null,mqs=[],seen=new Set(),lastSeen={},pingT=null,netStat={direct:'—',relay:'—',host:'waiting'};
 const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 me=ls.get('titan-uid')||('u'+Math.random().toString(36).slice(2,10));ls.set('titan-uid',me);
 const myName=()=>ls.get('titan-name')||'';
+const rid=()=>Math.random().toString(36).slice(2,12);
+function firstSeen(m){if(!m||!m.mid)return true;if(seen.has(m.mid))return false;seen.add(m.mid);if(seen.size>500)seen=new Set([...seen].slice(-200));return true}
 function syncNames(){if(S&&S.seats)S.seats.forEach(s=>{if(s.uid&&s.name)names[s.uid]=s.name})}
 function persistHost(){if(isHost)ls.set('titan-host',{room,S,V,t:Date.now()})}
-function broadcast(){conns.forEach(c=>{try{if(c.open)c.send({t:'state',S,V})}catch(e){}})}
+function setStat(k,v){netStat[k]=v;const e=document.getElementById('netStat');if(e)e.innerHTML=netStatHTML()}
+function netStatHTML(){return `Direct link: <b>${netStat.direct}</b> · Relay: <b>${netStat.relay}</b> · Host: <b>${netStat.host}</b>`}
+function isOnline(uid){return uid===me||conns.some(c=>c.uid===uid&&c.open)||(lastSeen[uid]&&Date.now()-lastSeen[uid]<30000)}
+
+/* --- MQTT relay --- */
+function startRelay(onMsg){
+  if(typeof mqtt==='undefined'){setStat('relay','unavailable');return}
+  let up=0;
+  BROKERS.forEach(url=>{let c;try{c=mqtt.connect(url,{clientId:'titan_'+rid(),clean:true,reconnectPeriod:4000,connectTimeout:8000,keepalive:30})}catch(e){return}
+    c.on('connect',()=>{up++;setStat('relay',up+' of '+BROKERS.length+' connected');
+      c.subscribe(TOPIC+room+(isHost?'/h':'/all'));if(!isHost)sendToHost({t:'hello',uid:me,name:myName()||'Player'})});
+    c.on('close',()=>{});
+    c.on('message',(topic,buf)=>{let m;try{m=JSON.parse(buf.toString())}catch(e){return}onMsg(m,null)});
+    c.on('error',()=>{});
+    mqs.push(c)});
+}
+function relayPub(sub,m,retain){mqs.forEach(c=>{try{if(c.connected)c.publish(TOPIC+room+sub,JSON.stringify(m),{qos:0,retain:!!retain})}catch(e){}})}
+
+/* --- sending --- */
+function broadcast(){const m={t:'state',S,V,mid:rid()};
+  conns.forEach(c=>{try{if(c.open)c.send(m)}catch(e){}});relayPub('/all',m,true)}
+function replyReject(c,uid,reason){const m={t:'state',S,V,reject:reason,to:uid,mid:rid()};
+  if(c){try{c.send(m)}catch(e){}}relayPub('/all',m,false)}
+function sendToHost(m){m.mid=m.mid||rid();m.uid=me;
+  if(hostConn&&hostConn.open){try{hostConn.send(m)}catch(e){}}relayPub('/h',m,false)}
+
 async function act(fn){
   if(busy)return;
   const S2=clone(S);const err=fn(S2);
@@ -746,35 +781,37 @@ async function act(fn){
   if(local){S=S2;render();return}
   if(isHost){if(S.status==='play'){const a=actor(S);if(a==null||S.seats[a].uid!==me){toast('It is not your turn.');return}}
     S=S2;V++;syncNames();persistHost();broadcast();render();return}
-  if(!hostConn||!hostConn.open){toast('Not connected to the host — reconnecting…');return}
-  busy=true;pending=setTimeout(()=>{busy=false;toast('The host did not answer. Try again.')},8000);
-  hostConn.send({t:'commit',S:S2,base:V});
+  busy=true;pending=setTimeout(()=>{busy=false;toast('The host did not answer. Check that the host still has the game open, then try again.')},10000);
+  sendToHost({t:'commit',S:S2,base:V});
 }
-function adoptState(nS,nV,reject){clearTimeout(pending);busy=false;S=nS;V=nV;syncNames();
+function adoptState(nS,nV,reject){clearTimeout(pending);busy=false;S=nS;V=nV;syncNames();setStat('host','connected');
   if(reject)toast(reject==='turn'?'It is not your turn.':'The game changed before your move landed. Showing the latest — try again.');render()}
-function onHostMsg(c,d){
-  if(!d||!d.t)return;
-  if(d.t==='hello'){c.uid=d.uid;
-    if(S.status==='lobby'){let seat=S.seats.find(s=>s.uid===d.uid)||S.seats.find(s=>!s.uid);
-      if(seat){seat.uid=d.uid;seat.name=(d.name||'Player').slice(0,24);V++;persistHost()}}
-    else{const seat=S.seats.find(s=>s.uid===d.uid);if(seat&&d.name){seat.name=d.name.slice(0,24)}}
+
+/* --- host side --- */
+function onHostMsg(m,c){
+  if(!m||!m.t||!firstSeen(m))return;
+  const uid=m.uid||(c&&c.uid);if(c&&uid)c.uid=uid;if(uid)lastSeen[uid]=Date.now();
+  if(m.t==='ping'){return}
+  if(m.t==='hello'){
+    if(S.status==='lobby'){let seat=S.seats.find(s=>s.uid===uid)||S.seats.find(s=>!s.uid);
+      if(seat){seat.uid=uid;seat.name=(m.name||'Player').slice(0,24);V++;persistHost()}}
+    else{const seat=S.seats.find(s=>s.uid===uid);if(seat&&m.name)seat.name=m.name.slice(0,24)}
     syncNames();broadcast();render();return}
-  if(d.t==='commit'){
-    if(d.base!==V){try{c.send({t:'state',S,V,reject:true})}catch(e){}return}
-    // only the seat whose turn it is (or the host-run lobby) may change the game
+  if(m.t==='commit'){
+    if(m.base!==V){replyReject(c,uid,'stale');return}
     const a=actor(S),seat=a!=null?S.seats[a]:null;
-    if(S.status==='play'&&(!seat||seat.uid!==c.uid)){try{c.send({t:'state',S,V,reject:'turn'})}catch(e){}return}
-    S=d.S;V++;syncNames();persistHost();broadcast();render();return}
+    if(S.status==='play'&&(!seat||seat.uid!==uid)){replyReject(c,uid,'turn');return}
+    S=m.S;V++;syncNames();persistHost();broadcast();render();return}
 }
 function setupPeer(id,onOpen){
-  if(typeof Peer==='undefined'){toast('Online play needs an internet connection (the connection library did not load).');return false}
-  peer=id?new Peer(id):new Peer();
-  peer.on('open',onOpen);
+  if(typeof Peer==='undefined'){setStat('direct','unavailable');return false}
+  try{peer=id?new Peer(id,{config:ICE}):new Peer({config:ICE})}catch(e){setStat('direct','unavailable');return false}
+  peer.on('open',()=>{setStat('direct',isHost?'listening':'ready');onOpen&&onOpen()});
   peer.on('error',e=>{
-    if(e.type==='unavailable-id')toast('That room code is in use — try again in a minute, or host a new game.');
-    else if(e.type==='peer-unavailable'){toast('No game found with that code (is the host online?).');if(!isHost)scheduleRetry()}
-    else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'){toast('Connection trouble — retrying…');if(!isHost)scheduleRetry()}
-    else toast('Connection error: '+e.type)});
+    if(e.type==='unavailable-id')toast('That room code is still reserved by the direct-link service. The relay will still work; or host a new game.');
+    if(e.type==='peer-unavailable'){setStat('direct','host not found');if(!isHost)scheduleRetry()}
+    else if(['network','server-error','socket-error','socket-closed'].includes(e.type)){setStat('direct','trouble — retrying');if(!isHost)scheduleRetry()}
+    else setStat('direct','error: '+e.type)});
   peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
   return true;
 }
@@ -784,29 +821,39 @@ function hostGame(n,resume){
   else{room=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
     S=newLobby(n,me);S.seats[0].uid=me;S.seats[0].name=myName()||'Host';V=1}
   syncNames();persistHost();mode='game';sel={};render();
-  setupPeer(PREFIX+room,()=>{toast('Hosting room '+room);render()});
-  peer&&peer.on('connection',c=>{conns.push(c);
-    c.on('data',d=>onHostMsg(c,d));
-    c.on('open',()=>{try{c.send({t:'state',S,V})}catch(e){}});
+  setupPeer(PREFIX+room,()=>{broadcast()});
+  if(peer)peer.on('connection',c=>{conns.push(c);
+    c.on('data',d=>onHostMsg(d,c));
+    c.on('open',()=>{try{c.send({t:'state',S,V,mid:rid()})}catch(e){}render()});
     c.on('close',()=>{conns=conns.filter(x=>x!==c);render()});});
+  startRelay(onHostMsg);
+  setTimeout(broadcast,3000);
+  clearInterval(pingT);pingT=setInterval(()=>{if(mode==='game'&&isHost&&!busy&&S&&S.status!=='play')render()},10000);
+}
+function onClientMsg(m){
+  if(!m||m.t!=='state'||!firstSeen(m))return;
+  if(m.to&&m.to!==me)return;
+  if(!m.reject&&S&&m.V<V)return;
+  adoptState(m.S,m.V,m.reject);
+}
+function connectDirect(){
+  if(!peer||!peer.open)return;
+  hostConn=peer.connect(PREFIX+room,{reliable:true});
+  hostConn.on('open',()=>{clearTimeout(retryT);setStat('direct','connected');sendToHost({t:'hello',uid:me,name:myName()||'Player'})});
+  hostConn.on('data',onClientMsg);
+  hostConn.on('close',()=>{setStat('direct','lost — retrying');if(mode==='game')scheduleRetry()});
 }
 function joinRoom(code){
   local=false;isHost=false;room=code.toUpperCase().trim();ls.set('titan-room',room);
-  mode='game';S=null;sel={};render();
-  const go=()=>{
-    hostConn=peer.connect(PREFIX+room,{reliable:true});
-    hostConn.on('open',()=>{clearTimeout(retryT);hostConn.send({t:'hello',uid:me,name:myName()||'Player'})});
-    hostConn.on('data',d=>{if(d&&d.t==='state')adoptState(d.S,d.V,d.reject)});
-    hostConn.on('close',()=>{if(mode==='game'){toast('Lost the host — reconnecting…');scheduleRetry()}});
-  };
-  if(peer&&peer.open)go();else setupPeer(null,go);
+  mode='game';S=null;sel={};netStat={direct:'connecting',relay:'connecting',host:'waiting'};render();
+  setupPeer(null,connectDirect);
+  startRelay(onClientMsg);
+  clearInterval(pingT);pingT=setInterval(()=>{if(mode!=='game'||isHost)return;sendToHost({t:S?'ping':'hello',uid:me,name:myName()||'Player'})},8000);
+  setTimeout(()=>{if(!S&&mode==='game')setStat('host','not answering — is the host on the waiting screen with this code?')},20000);
 }
-function scheduleRetry(){clearTimeout(retryT);retryT=setTimeout(()=>{if(mode==='game'&&!isHost&&peer&&!peer.destroyed){
-  hostConn=peer.connect(PREFIX+room,{reliable:true});
-  hostConn.on('open',()=>{hostConn.send({t:'hello',uid:me,name:myName()||'Player'})});
-  hostConn.on('data',d=>{if(d&&d.t==='state')adoptState(d.S,d.V,d.reject)});
-  hostConn.on('close',()=>{if(mode==='game')scheduleRetry()});}},3000)}
-function backToLobby(){try{peer&&peer.destroy()}catch(e){}peer=null;conns=[];hostConn=null;isHost=false;clearTimeout(retryT);mode='lobby';S=null;local=false;render()}
+function scheduleRetry(){clearTimeout(retryT);retryT=setTimeout(()=>{if(mode==='game'&&!isHost&&peer&&!peer.destroyed&&!(hostConn&&hostConn.open))connectDirect()},4000)}
+function backToLobby(){try{peer&&peer.destroy()}catch(e){}mqs.forEach(c=>{try{c.end(true)}catch(e){}});mqs=[];peer=null;conns=[];hostConn=null;isHost=false;
+  clearTimeout(retryT);clearInterval(pingT);mode='lobby';S=null;local=false;render()}
 $('#btnLobby').onclick=backToLobby;
 
 /* ================= LOBBY ================= */
@@ -870,7 +917,8 @@ function pickModal(title,items,cb,note=''){
 function render(){
   if(mode==='lobby'){renderLobby();return}
   $('#btnLobby').style.display='';
-  if(!S){$('#main').innerHTML='<div class="lobby parch"><p class="muted">Loading game…</p></div>';return}
+  if(!S){$('#main').innerHTML=`<div class="lobby parch"><h2>Joining room ${esc(room||'')}…</h2><p id="netStat" class="muted">${netStatHTML()}</p>
+    <p class="muted" style="font-size:14.5px">Only one route needs to work. If the host still isn't found after about 20 seconds, check the room code and make sure the host has the game open on its waiting screen.</p></div>`;return}
   if(S.status==='lobby'){renderWaiting();return}
   const inBattle=S.eng&&S.eng.stage==='battle';
   $('#hdrInfo').textContent=`Turn ${S.turn}`+(local?' · hotseat':'');
@@ -885,7 +933,7 @@ function renderWaiting(){
     <p style="font-size:20px">Room code: <b class="cinzel" style="letter-spacing:.25em;font-size:26px;color:var(--blood)">${esc(room||'')}</b>
       <button class="alt" id="wCopy" style="margin-left:8px">Copy invite</button></p>
     <p class="muted">${isHost?'Send friends the game file and this code. They choose "Join" and type it in. No accounts needed.':'Connected. Waiting for the host to start…'}</p>
-    <p>${seated} of ${S.seats.length} seats filled.</p>
+    <p>${seated} of ${S.seats.length} seats filled.</p>${isHost?`<p id="netStat" class="muted" style="font-size:14px">${netStatHTML().replace(/ · Host:.*$/,'')}</p>`:''}
     <div class="chits" style="gap:10px">${S.seats.map(s=>`<div class="seatTag" style="background:${s.uid?'#7a5a34':'#b8a586'};font-size:15px;padding:5px 12px">${s.uid?esc(s.name||'Player')+(s.uid===me?' (you)':''):'Open seat'}</div>`).join('')}</div>
     <div class="row" style="margin-top:16px">
       ${isHost?`<button id="wStart" ${seated<2?'disabled':''}>Start the game${seated<S.seats.length?' with '+seated:''}</button>`:''}
@@ -1021,7 +1069,7 @@ function trayHTML(){
 function sideHTML(){
   const a=actor(S),mine=myTurn();
   let h=`<div class="parch card players"><h3>Players</h3>${S.seats.map((s,i)=>`<div class="p ${i===S.cur&&S.status==='play'?'cur':''} ${s.alive?'':'dead'}">
-      <span class="sw" style="background:${COLORS[s.color].c}"></span><span>${esc(pname(i))}${mySeats().includes(i)&&!local?' <i>(you)</i>':''}${!local&&isHost&&s.uid!==me&&!conns.some(c=>c.uid===s.uid&&c.open)?' <i title="not connected">⚠</i>':''}</span>
+      <span class="sw" style="background:${COLORS[s.color].c}"></span><span>${esc(pname(i))}${mySeats().includes(i)&&!local?' <i>(you)</i>':''}${!local&&isHost&&s.uid!==me&&!isOnline(s.uid)?' <i title="not connected">⚠</i>':''}</span>
       <span class="muted" style="font-size:13px">${legionsOf(S,i).length} leg.</span><span class="score">${s.score}</span></div>`).join('')}</div>`;
   h+=`<div class="parch card">`;
   if(S.status==='play'&&S.post){
@@ -1198,7 +1246,7 @@ function clickHex(h){
 function rulesHTML(){
   return `<details><summary>Rules at a glance</summary><div style="font-size:14.5px;line-height:1.4">
   <p><b>Goal.</b> Be the last player with a living Titan.</p>
-  <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits:</b> on the first step a legion may leave through an arch (∩), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Every later step must follow single or triple arrows. A legion stops when it enters a land with an enemy → resolve engagements → muster one creature in each legion that moved.</p>
+  <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits</b> (board legend): starting a move, a legion may leave through a circle (●), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Continuing, it must follow triple arrows where its land has them, otherwise a single arrow, and may never backtrack. A legion stops when it enters a land with an enemy → resolve engagements → muster one creature in each legion that moved.</p>
   <p><b>Teleport.</b> On a 6, a legion with a Lord in a Tower may teleport to any empty Tower. With 400+ points, your Titan's legion may teleport onto any enemy legion. One teleport per turn.</p>
   <p><b>Mustering.</b> Each terrain has a recruit tree. You may muster a creature if the legion already has one of it, has enough of the next-lower creature (number shown), or has a higher creature in that tree. Towers muster Centaur, Gargoyle or Ogre freely; a Guardian with three of one kind; a Warlock with your Titan.</p>
   <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender (entering on the narrow left side) moves first, the attacker enters on the wide right side. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
@@ -1209,7 +1257,7 @@ function rulesHTML(){
 
 /* ================= BOOT ================= */
 render();
-if(/^#room-/i.test(location.hash)&&myName()){joinRoom(location.hash.slice(6))}
+if(/^#room-/i.test(location.hash)&&myName()){setTimeout(()=>joinRoom(location.hash.slice(6)),600)}
 window.addEventListener('beforeunload',e=>{if(isHost&&S&&S.status==='play'&&conns.length){e.preventDefault();e.returnValue=''}});
 </script>
 </body>
