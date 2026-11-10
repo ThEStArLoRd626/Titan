@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titan — Fan Web Edition (play with anyone)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --parch:#efe2c2; --parch2:#e2cfa2; --ink:#2b2118; --ink2:#5a4632; --bronze:#8c5a2b; --bronze2:#b98543;
+  --blood:#8e2a1e; --ok:#3d6b35; --shadow:0 2px 10px rgba(40,25,10,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:"EB Garamond",Georgia,serif; color:var(--ink); font-size:17px;
+  background:#3a0a0c;
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(150,30,35,.45), transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgba(60,30,10,.6), transparent 60%);
+  min-height:100vh;
+}
+h1,h2,h3,.cinzel{font-family:Cinzel,serif;letter-spacing:.04em}
+button{
+  font-family:Cinzel,serif; font-weight:700; font-size:13px; letter-spacing:.05em;
+  border:1px solid #5b3a1a; border-radius:4px; padding:7px 12px; cursor:pointer; color:#2b1a0b;
+  background:linear-gradient(#e9c98d,#c4924f); box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 1px 2px rgba(0,0,0,.4);
+}
+button:hover:not(:disabled){filter:brightness(1.08)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.alt{background:linear-gradient(#efe4cc,#cdbb96)}
+button.danger{background:linear-gradient(#d98a72,#a8492f);color:#fff3e6}
+.parch{
+  background:var(--parch);
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,.45), transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(150,100,40,.25), transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .12 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  border:1px solid #9c7a4a; border-radius:6px; box-shadow:var(--shadow);
+}
+#app{display:flex;flex-direction:column;min-height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;color:#f1dcb0}
+header h1{margin:0;font-size:24px;font-weight:900;color:#f3d79a;text-shadow:0 2px 0 #3a210e}
+header .sub{font-style:italic;opacity:.8}
+header .sp{flex:1}
+main{flex:1;display:flex;gap:14px;padding:0 14px 14px;align-items:flex-start}
+#boardWrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center}
+#boardWrap svg{width:100%;max-width:min(92vh,980px);height:auto;display:block;user-select:none}
+#side{width:360px;flex:0 0 360px;display:flex;flex-direction:column;gap:12px}
+.card{padding:12px 14px}
+.card h3{margin:0 0 8px;font-size:15px;color:var(--bronze);border-bottom:1px solid rgba(140,90,43,.35);padding-bottom:4px}
+.players .p{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px}
+.players .p.cur{background:rgba(185,133,67,.25);outline:1px solid rgba(140,90,43,.4)}
+.players .p.dead{opacity:.45;text-decoration:line-through}
+.sw{width:16px;height:16px;border-radius:3px;border:1px solid #000a;flex:0 0 16px}
+.players .score{margin-left:auto;font-family:Cinzel;font-weight:700}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--ink2);font-style:italic}
+.phase{font-family:Cinzel;font-weight:700;font-size:16px}
+.log{max-height:190px;overflow:auto;font-size:14.5px;line-height:1.35}
+.log div{border-bottom:1px dotted rgba(90,70,50,.25);padding:2px 0}
+.chits{display:flex;flex-wrap:wrap;gap:6px}
+.chit{width:60px;height:60px;border-radius:8px;position:relative;cursor:default;overflow:hidden;
+  background:radial-gradient(circle at 30% 25%,#fffaea,#f1e2bd 60%,#e1c995);border:1.5px solid var(--b,#b59a68);
+  box-shadow:0 2px 3px rgba(0,0,0,.45),inset 0 0 5px rgba(140,100,40,.35);font-family:Cinzel;color:#2a1d12}
+.chit .nm{position:absolute;top:3px;left:0;right:0;text-align:center;font-size:8px;font-weight:900;letter-spacing:.02em}
+.chit .ban{position:absolute;top:2px;left:3px;right:3px;text-align:center;font-size:8px;font-weight:900;color:#fff;border-radius:2px;padding:1px 0}
+.chit .art{position:absolute;left:14px;top:13px;width:32px;height:32px}
+.chit .ps{position:absolute;bottom:1px;left:5px;right:5px;display:flex;justify-content:space-between;font-size:14px;font-weight:900}
+.chit .bow{position:absolute;left:4px;top:24px;font-size:11px;color:#2a1d12}
+.chit .wing{position:absolute;right:4px;top:24px;font-size:11px;color:#2a1d12}
+.chit .hit{position:absolute;top:13px;right:2px;background:#a8231a;color:#fff;border-radius:8px;padding:0 4px;font-size:10px;z-index:2}
+.chit.sel{outline:3px solid #ffd76a;outline-offset:1px}
+.chit.pick{cursor:pointer}
+.die{display:inline-flex;width:34px;height:34px;border-radius:6px;background:#fbf4e2;border:1px solid #6b4b2a;align-items:center;justify-content:center;
+  font-family:Cinzel;font-weight:900;font-size:20px;color:#2b1a0b;box-shadow:inset 0 -2px 0 rgba(0,0,0,.15)}
+.die.sm{width:22px;height:22px;font-size:13px}
+.die.hit{background:#8e2a1e;color:#fff}
+.modalBg{position:fixed;inset:0;background:rgba(20,10,4,.6);display:flex;align-items:center;justify-content:center;z-index:20}
+.modal{max-width:560px;width:calc(100% - 30px);padding:18px 20px}
+.modal h2{margin:0 0 10px;color:var(--bronze);font-size:20px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b1a0b;color:#f6dfae;padding:9px 16px;border-radius:6px;z-index:30;
+  font-family:Cinzel;font-size:13px;box-shadow:var(--shadow)}
+.lobby{max-width:820px;margin:20px auto;padding:22px 26px;width:calc(100% - 28px)}
+.lobby h2{margin:0 0 6px;color:var(--bronze)}
+.gameRow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dotted rgba(90,70,50,.35)}
+.gameRow .seats{display:flex;gap:4px;flex-wrap:wrap}
+.seatTag{font-size:13px;padding:2px 7px;border-radius:10px;border:1px solid #0004;color:#fff;text-shadow:0 1px 1px #000}
+.tray{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px;min-height:20px}
+.legend{font-size:13.5px}
+details summary{cursor:pointer;font-family:Cinzel;font-weight:700;color:var(--bronze)}
+.banner{padding:8px 12px;margin-bottom:8px;border-left:4px solid var(--bronze);background:rgba(185,133,67,.18)}
+@media (max-width:980px){ main{flex-direction:column;align-items:stretch} #side{width:auto;flex:none} }
+svg .land{cursor:pointer}
+svg .hl{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{stroke-opacity:1}50%{stroke-opacity:.35}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>TITAN</h1><span class="sub">a fan-made web edition</span><span class="sp"></span>
+    <span id="hdrInfo" class="cinzel" style="font-size:13px"></span>
+    <button class="alt" id="btnLobby" style="display:none">Lobby</button>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="modalRoot"></div>
+<script>
+//#LOGIC-START
+/* ================= RULES DATA ================= */
+const COLORS=[
+  {n:'Black',c:'#2b2726',k:'Bk'},{n:'Blue',c:'#2f5fa8',k:'Bu'},{n:'Brown',c:'#7b4b29',k:'Br'},
+  {n:'Gold',c:'#cf9f2e',k:'Gd'},{n:'Green',c:'#3c7a36',k:'Gr'},{n:'Red',c:'#b2302a',k:'Rd'}];
+// name: [power, skill, flags (f=flies r=rangestrikes l=lord), count in the box]
+const CRE={
+  Angel:[6,4,'fl',18], Archangel:[9,4,'fl',6], Behemoth:[8,3,'',18], Centaur:[3,4,'',25],
+  Colossus:[10,4,'',10], Cyclops:[9,2,'',28], Dragon:[9,3,'fr',18], Gargoyle:[4,3,'f',21],
+  Giant:[7,4,'r',18], Gorgon:[6,3,'fr',25], Griffon:[5,4,'f',18], Guardian:[12,2,'f',6],
+  Hydra:[10,3,'r',10], Lion:[5,3,'',28], Minotaur:[4,4,'r',21], Ogre:[6,2,'',25],
+  Ranger:[4,4,'fr',28], Serpent:[18,2,'',10], Titan:[6,4,'l',0], Troll:[8,2,'',28],
+  Unicorn:[6,4,'',12], Warbear:[6,3,'',21], Warlock:[5,4,'r',6], Wyvern:[7,3,'f',18]};
+// recruit trees: [creature, number of the next-lower creature needed]
+const TREES={
+  Brush:[['Gargoyle',0],['Cyclops',2],['Gorgon',2]],
+  Desert:[['Lion',0],['Griffon',3],['Hydra',2]],
+  Hills:[['Ogre',0],['Minotaur',3],['Unicorn',2]],
+  Jungle:[['Gargoyle',0],['Cyclops',2],['Behemoth',3],['Serpent',2]],
+  Marsh:[['Ogre',0],['Troll',2],['Ranger',2]],
+  Mountains:[['Lion',0],['Minotaur',2],['Dragon',2],['Colossus',2]],
+  Plains:[['Centaur',0],['Lion',2],['Ranger',2]],
+  Swamp:[['Troll',0],['Wyvern',3],['Hydra',2]],
+  Tundra:[['Troll',0],['Warbear',2],['Giant',2],['Colossus',2]],
+  Woods:[['Centaur',0],['Warbear',3],['Unicorn',2]],
+  Tower:[['Centaur',0],['Gargoyle',0],['Ogre',0],['Guardian',3],['Warlock',1]]};
+const BATTLE_TURNS=7, MAX_LEGION=7, TITAN_TELEPORT=400;
+
+const isLord=c=>CRE[c][2].includes('l');
+const flies=c=>CRE[c][2].includes('f');
+const ranges=c=>CRE[c][2].includes('r');
+const skillOf=c=>CRE[c][1];
+function powerOf(S,seat,c){return c==='Titan'?6+Math.floor((S.seats[seat]?.score||0)/100):CRE[c][0]}
+function valueOf(S,seat,c){return powerOf(S,seat,c)*skillOf(c)}
+function rnd(n){return 1+Math.floor(Math.random()*n)}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ================= MASTERBOARD ================= */
+const BOARD=[["Swamp",225.0,324.3,1,"38",[[3,4]]],["Plains",225.0,381.3,0,"46",[[0,4]]],["Brush",273.9,238.8,1,"26",[[7,4]]],["Marsh",273.9,295.8,0,"31",[[2,4],[8,2]]],["Brush",273.9,409.8,1,"54",[[1,4],[9,2]]],["Jungle",273.9,466.8,0,"61",[[4,4]]],["Desert",322.9,153.3,1,"14",[[13,4]]],["Plains",322.9,210.3,0,"20",[[6,4],[14,2]]],["Hills",322.9,324.3,1,"39",[[3,1],[9,4]]],["Jungle",322.9,381.3,0,"47",[[4,1],[16,4]]],["Marsh",322.9,495.3,1,"66",[[5,4],[17,2]]],["Brush",322.9,552.3,0,"72",[[10,4]]],["Marsh",371.9,67.8,1,"5",[[20,4]]],["Brush",371.9,124.8,0,"10",[[12,4],[21,2]]],["Tower",371.9,238.8,1,"200",[[7,3],[15,3],[22,3]]],["Brush",371.9,295.8,0,"32",[[8,4],[14,2]]],["Plains",371.9,409.8,1,"55",[[17,2],[24,4]]],["Tower",371.9,466.8,0,"400",[[10,3],[16,3],[25,3]]],["Plains",371.9,580.8,1,"78",[[11,4],[26,2]]],["Desert",371.9,637.8,0,"82",[[18,4]]],["Jungle",420.8,39.3,0,"1",[[28,4]]],["Jungle",420.8,153.3,1,"15",[[13,1],[22,4]]],["Marsh",420.8,210.3,0,"21",[[14,2],[30,4]]],["Woods",420.8,324.3,1,"40",[[15,4],[24,2]]],["Desert",420.8,381.3,0,"48",[[23,2],[32,4]]],["Brush",420.8,495.3,1,"67",[[17,2],[26,4]]],["Woods",420.8,552.3,0,"73",[[18,2],[34,4]]],["Marsh",420.8,666.3,1,"87",[[19,4]]],["Plains",469.8,67.8,1,"6",[[29,2],[36,4]]],["Woods",469.8,124.8,0,"11",[[21,4],[28,2]]],["Swamp",469.8,238.8,1,"27",[[31,4],[38,2]]],["Plains",469.8,295.8,0,"33",[[23,4],[39,2]]],["Marsh",469.8,409.8,1,"56",[[33,4],[40,2]]],["Hills",469.8,466.8,0,"62",[[25,4],[41,2]]],["Jungle",469.8,580.8,1,"79",[[35,1],[42,4]]],["Brush",469.8,637.8,0,"83",[[27,4],[34,2]]],["Brush",518.7,39.3,0,"2",[[44,4]]],["Brush",518.7,153.3,1,"16",[[29,4],[45,2]]],["Hills",518.7,210.3,0,"22",[[30,2],[37,4]]],["Mountains",518.7,324.3,1,"41",[[31,1],[40,3]]],["Tundra",518.7,381.3,0,"49",[[32,1],[39,3],[48,3]]],["Swamp",518.7,495.3,1,"68",[[33,2],[49,4]]],["Marsh",518.7,552.3,0,"74",[[41,4],[50,2]]],["Swamp",518.7,666.3,1,"88",[[35,4]]],["Marsh",567.7,67.8,1,"7",[[45,2],[52,4]]],["Tower",567.7,124.8,0,"100",[[37,3],[44,3],[53,3]]],["Marsh",567.7,238.8,1,"28",[[38,4],[47,2]]],["Tundra",567.7,295.8,0,"34",[[39,3],[46,1],[55,3]]],["Mountains",567.7,409.8,1,"57",[[40,3],[49,2],[56,3]]],["Plains",567.7,466.8,0,"63",[[48,2],[57,4]]],["Tower",567.7,580.8,1,"600",[[42,3],[51,3],[58,3]]],["Plains",567.7,637.8,0,"84",[[43,4],[50,2]]],["Swamp",616.6,39.3,0,"3",[[60,4]]],["Plains",616.6,153.3,1,"17",[[45,2],[54,4]]],["Desert",616.6,210.3,0,"23",[[46,4],[62,2]]],["Mountains",616.6,324.3,1,"42",[[56,3],[63,1]]],["Tundra",616.6,381.3,0,"50",[[48,3],[55,3],[64,1]]],["Woods",616.6,495.3,1,"69",[[58,4],[65,2]]],["Brush",616.6,552.3,0,"75",[[50,2],[66,4]]],["Brush",616.6,666.3,1,"89",[[51,4]]],["Brush",665.5,67.8,1,"8",[[61,2],[68,4]]],["Jungle",665.5,124.8,0,"12",[[53,4],[60,1]]],["Woods",665.5,238.8,1,"29",[[54,2],[70,4]]],["Plains",665.5,295.8,0,"35",[[55,2],[62,4]]],["Marsh",665.5,409.8,1,"58",[[56,2],[72,4]]],["Desert",665.5,466.8,0,"64",[[57,2],[64,4]]],["Hills",665.5,580.8,1,"80",[[67,1],[74,4]]],["Marsh",665.5,637.8,0,"85",[[59,4],[66,1]]],["Plains",714.5,39.3,0,"4",[[76,4]]],["Hills",714.5,153.3,1,"18",[[61,4],[77,1]]],["Brush",714.5,210.3,0,"24",[[69,4],[78,2]]],["Swamp",714.5,324.3,1,"43",[[63,4],[72,2]]],["Hills",714.5,381.3,0,"51",[[71,3],[80,4]]],["Plains",714.5,495.3,1,"70",[[65,4],[81,2]]],["Jungle",714.5,552.3,0,"76",[[73,4],[82,1]]],["Jungle",714.5,666.3,1,"90",[[67,4]]],["Desert",763.5,67.8,1,"9",[[77,4]]],["Marsh",763.5,124.8,0,"13",[[69,2],[84,4]]],["Tower",763.5,238.8,1,"300",[[70,3],[79,3],[85,3]]],["Marsh",763.5,295.8,0,"36",[[71,4],[78,2]]],["Brush",763.5,409.8,1,"59",[[81,2],[87,4]]],["Tower",763.5,466.8,0,"500",[[73,3],[80,3],[88,3]]],["Brush",763.5,580.8,1,"81",[[74,2],[83,4]]],["Plains",763.5,637.8,0,"86",[[75,4]]],["Brush",812.4,153.3,1,"19",[[85,4]]],["Plains",812.4,210.3,0,"25",[[78,2],[90,4]]],["Jungle",812.4,324.3,1,"44",[[79,4],[91,2]]],["Woods",812.4,381.3,0,"52",[[86,4],[92,2]]],["Marsh",812.4,495.3,1,"71",[[81,2],[89,4]]],["Desert",812.4,552.3,0,"77",[[82,4]]],["Jungle",861.4,238.8,1,"30",[[91,4]]],["Brush",861.4,295.8,0,"37",[[86,2],[94,4]]],["Plains",861.4,409.8,1,"60",[[87,2],[93,4]]],["Brush",861.4,466.8,0,"65",[[88,4]]],["Marsh",910.3,324.3,1,"45",[[95,4]]],["Swamp",910.3,381.3,0,"53",[[92,4]]]];
+// Each land: [terrain, x, y, pointsUp, label, exits[[toIndex, type]]]  type: 4=arrows 3=arrow 2=arch 1=block
+const LANDS={}, LAND_IDS=[], TOWERS=[];
+BOARD.forEach(([terrain,x,y,up,label,ex],i)=>{const id='L'+i;LANDS[id]={id,terrain,x,y,up:!!up,label,exits:ex.map(([t,k])=>['L'+t,k])};LAND_IDS.push(id);if(terrain==='Tower')TOWERS.push(id)});
+
+/* ================= BATTLELAND ================= */
+const BCOLS=[3,4,5,6,5,4], HEX=[], HEXBY={}, HADJ={}, HDIST={};
+(function buildBattle(){
+  BCOLS.forEach((n,c)=>{for(let r=0;r<n;r++){const h={id:c+'-'+r,c,r,x:c*1.5,y:(r-(n-1)/2)*Math.sqrt(3)};HEX.push(h);HEXBY[h.id]=h}});
+  HEX.forEach(a=>{HADJ[a.id]=HEX.filter(b=>b!==a&&Math.hypot(a.x-b.x,a.y-b.y)<1.8).map(b=>b.id)});
+  HEX.forEach(a=>{const d={[a.id]:0},q=[a.id];while(q.length){const x=q.shift();for(const y of HADJ[x])if(d[y]==null){d[y]=d[x]+1;q.push(y)}}HDIST[a.id]=d});
+})();
+const entryCol=side=>side==='A'?BCOLS.length-1:0;
+// Battleland features, read from the battleland cards. Hex ids are "column-row" (columns 3-4-5-6-5-4).
+const BATTLELANDS={
+  Plains:{},
+  Marsh:{bog:['0-0','3-1','2-2','2-3','4-2','4-4']},
+  Swamp:{tree:['2-1','4-1','2-3'],bog:['2-0','1-2','3-3','5-2','3-5']},
+  Brush:{bramble:['0-0','2-1','3-1','5-0','4-2','1-2','3-4','3-5']},
+  Jungle:{tree:['1-0','5-1','3-3'],bramble:['2-0','5-0','3-2','0-1','2-2','4-3','2-4']},
+  Woods:{tree:['0-0','4-0','2-2','4-2','3-5']},
+  Tundra:{drift:['2-0','2-1','4-1','1-2','3-3','5-2','0-2','2-3','4-4']},
+  Desert:{sand:['3-0','4-0','5-0','3-1','4-1','3-2','0-1','1-2','0-2','4-4','3-5']},
+  Hills:{tree:['2-1','2-3','5-2'],hill:['3-0','1-1','4-2','1-3','3-4']},
+  Mountains:{hill:['1-3','2-0','3-0','5-0','5-2'],volcano:['3-2']},
+  Tower:{wall:['3-1','3-3','2-1','2-2','4-1','4-2'],keep:['3-2']}};
+const NATIVE={bog:['Ogre','Troll','Ranger','Wyvern','Hydra'],bramble:['Gargoyle','Cyclops','Gorgon','Behemoth','Serpent'],
+  sand:['Lion','Griffon','Hydra'],drift:['Troll','Warbear','Giant','Colossus'],slope:['Ogre','Lion','Minotaur','Unicorn','Dragon','Colossus'],volcano:['Dragon']};
+const HAZ_NAME={bog:'Bog',bramble:'Brambles',sand:'Sand',drift:'Drift',tree:'Tree',hill:'Slope',volcano:'Volcano',wall:'Tower wall',keep:'Tower keep'};
+function hazardAt(terrain,h){const m=BATTLELANDS[terrain];if(!m)return null;for(const k in m)if(m[k].includes(h))return k;return null}
+const isNative=(c,k)=>(NATIVE[k]||[]).includes(c);
+function elevOf(terrain,h){const z=hazardAt(terrain,h);return z==='keep'||z==='volcano'?2:z==='hill'||z==='wall'?1:0}
+// can this creature end its move here?
+function canStand(terrain,c,h){const z=hazardAt(terrain,h);
+  if(z==='tree')return false; if(z==='bog')return isNative(c,'bog'); if(z==='volcano')return isNative(c,'volcano'); return true}
+// does a walking creature have to stop on entering h (coming from 'from')?  (hazard chart: "slowed")
+function mustStopIn(terrain,c,h,from){const z=hazardAt(terrain,h);
+  if((z==='bramble'||z==='sand'||z==='drift')&&!isNative(c,z))return true;
+  if(from&&elevOf(terrain,h)>elevOf(terrain,from)){
+    if(z==='wall'||z==='keep')return true;               // walls slow everyone climbing them
+    if(!isNative(c,'slope'))return true;                 // slopes slow non-natives
+  }
+  return false}
+// 12.4 line of sight: each step of the path is one hex, or two when the line runs along a hexside (striker picks)
+function losSlots(a,b){const A=HEXBY[a],B=HEXBY[b],slots=[],seen=new Set();
+  for(let i=1;i<60;i++){const f=i/60,x=A.x+(B.x-A.x)*f,y=A.y+(B.y-A.y)*f;
+    const ds=HEX.map(h=>[Math.hypot(h.x-x,h.y-y),h.id]).sort((p,q)=>p[0]-q[0]);
+    const slot=ds[1][0]-ds[0][0]<0.02?[ds[0][1],ds[1][1]].sort():[ds[0][1]];
+    if(slot.includes(a)||slot.includes(b))continue;const k=slot.join();if(!seen.has(k)){seen.add(k);slots.push(slot)}}
+  return slots.filter(sl=>sl.length===1||!slots.some(o=>o.length===1&&sl.includes(o[0])))}
+function hexesBetween(a,b){return [...new Set(losSlots(a,b).flat())]}
+function rangeBlocked(B,u,t){
+  if(u.c==='Warlock')return false;                                   // 12.6
+  const blocked=h=>hazardAt(B.terrain,h)==='tree'||!!occ(B,h);
+  return losSlots(u.hex,t.hex).some(sl=>sl.every(blocked))}
+// strike number and dice, per the hazard chart
+function strikeNumber(terrain,a,t,range){
+  let sk=skillOf(a.c);const za=hazardAt(terrain,a.hex),zt=hazardAt(terrain,t.hex),ea=elevOf(terrain,a.hex),et=elevOf(terrain,t.hex);
+  if(!range){
+    if(et>ea&&(zt==='wall'||zt==='keep'))sk--;                     // striking up across a wall
+    if(ea>et&&(za==='wall'||za==='keep'))sk++;                     // striking down across a wall
+    if(et>ea&&zt!=='wall'&&zt!=='keep'&&!isNative(a.c,'slope'))sk--; // non-native striking up a slope
+    if(za==='bramble'&&!isNative(a.c,'bramble'))sk--;              // non-native striking out of brambles
+  }else if(a.c!=='Warlock'){                                        // 12.6: Warlocks ignore hazards and range
+    if(HDIST[a.hex][t.hex]+1===4)sk--;                                 // 12.3: range 4 costs a skill factor
+    if(et>ea&&(zt==='wall'||zt==='keep'))sk--;
+    if(!isNative(a.c,'bramble'))sk-=losSlots(a.hex,t.hex).filter(sl=>sl.every(h=>hazardAt(terrain,h)==='bramble')).length;
+  }
+  let tn=4-sk+skillOf(t.c);
+  if(!(range&&a.c==='Warlock')){
+    if(zt==='bramble'&&isNative(t.c,'bramble')&&!isNative(a.c,'bramble'))tn++; // native defending in brambles
+    if(range&&zt==='volcano'&&t.c==='Dragon')tn++;
+  }
+  return Math.max(1,Math.min(6,tn))}
+function strikeDice(S,terrain,a,t,range){
+  let d=unitPower(S,a);const za=hazardAt(terrain,a.hex),ea=elevOf(terrain,a.hex),et=elevOf(terrain,t.hex);
+  if(range)d=Math.floor(d/2);
+  if(za==='volcano'&&a.c==='Dragon')d+=2;                          // Dragons in the Volcano
+  if(!range&&ea>et&&(za==='hill'||za==='volcano')&&isNative(a.c,'slope'))d++; // native striking down a slope
+  return d}
+
+/* ================= GAME STATE ================= */
+function newLobby(n,hostUid){
+  return {status:'lobby',host:hostUid,seats:Array.from({length:n},()=>({uid:null})),log:[],created:Date.now()};
+}
+function log(S,msg){S.log.push(msg);if(S.log.length>80)S.log.splice(0,S.log.length-80)}
+function seatName(S,i){return COLORS[S.seats[i].color].n}
+function startGame(S){
+  S.seats=S.seats.filter(s=>s.uid!=null);
+  const towers=shuffle(TOWERS.slice()), cols=shuffle([0,1,2,3,4,5]);
+  S.care={};for(const c in CRE)S.care[c]=CRE[c][3];
+  S.legions={};
+  S.seats.forEach((s,i)=>{
+    s.color=cols[i];s.score=0;s.alive=true;s.tower=towers[i];
+    const id=COLORS[s.color].k+'01';
+    const cre=['Titan','Angel','Centaur','Centaur','Gargoyle','Gargoyle','Ogre','Ogre'];
+    cre.forEach(c=>{if(c!=='Titan')S.care[c]--});
+    S.legions[id]={id,owner:i,land:s.tower,cre,moved:false,rec:false};
+  });
+  // turn order: random
+  const order=shuffle(S.seats.map((_,i)=>i));
+  S.seats=order.map(i=>S.seats[i]);
+  Object.values(S.legions).forEach(L=>{L.owner=order.indexOf(L.owner)});
+  Object.assign(S,{status:'play',turn:1,cur:0,phase:'split',roll:null,mull:{},tele:false,eng:null,lastRoll:null,winner:null});
+  log(S,'The game begins. Each player must split their starting legion into two legions of four.');
+}
+const legionsOf=(S,seat)=>Object.values(S.legions).filter(L=>L.owner===seat);
+const legionsAt=(S,land)=>Object.values(S.legions).filter(L=>L.land===land);
+function nextMarker(S,seat){const k=COLORS[S.seats[seat].color].k;for(let i=1;i<=12;i++){const id=k+String(i).padStart(2,'0');if(!S.legions[id])return id}return null}
+function legionValue(S,L){return L.cre.reduce((a,c)=>a+valueOf(S,L.owner,c),0)}
+function returnToCare(S,cre){cre.forEach(c=>{if(c!=='Titan')S.care[c]++})}
+
+function actor(S){
+  if(!S||S.status!=='play')return null;
+  if(S.post)return S.post.owner;
+  if(S.eng){
+    if(S.eng.stage==='decide')return S.legions[S.eng.def].owner;
+    const B=S.eng.battle, side=B.phase==='sb'?other(B.side):B.side;
+    return S.legions[side==='A'?S.eng.att:S.eng.def].owner;
+  }
+  return S.cur;
+}
+const other=s=>s==='A'?'D':'A';
+
+/* ---- split ---- */
+function doSplit(S,lid,idxs){
+  const L=S.legions[lid];
+  if(S.phase!=='split'||!L||L.owner!==S.cur)return 'You can only split during your split phase.';
+  const moving=idxs.map(i=>L.cre[i]), stay=L.cre.filter((_,i)=>!idxs.includes(i));
+  if(moving.length<2||stay.length<2)return 'Each legion needs at least two creatures.';
+  if(L.cre.length===8&&moving.length!==4)return 'The starting legion must split four and four.';
+  const id=nextMarker(S,L.owner);if(!id)return 'You have no legion markers left.';
+  L.cre=stay;S.legions[id]={id,owner:L.owner,land:L.land,cre:moving,moved:false,rec:false};
+  log(S,`${seatName(S,L.owner)} splits ${lid} → ${id} (${moving.length}).`);
+}
+function doMerge(S,a,b){
+  const A=S.legions[a],B=S.legions[b];
+  if(S.phase!=='split'||A.owner!==S.cur||B.owner!==S.cur||A.land!==B.land)return 'Cannot merge.';
+  if(A.cre.length+B.cre.length>(S.turn===1?8:7))return 'Too many creatures for one legion.';
+  A.cre=A.cre.concat(B.cre);delete S.legions[b];
+}
+function endSplit(S){
+  if(legionsOf(S,S.cur).some(L=>L.cre.length>7))return 'Split your eight-creature legion first.';
+  S.phase='move';S.roll=rnd(6);
+  log(S,`${seatName(S,S.cur)} rolls a ${S.roll} for movement.`);
+}
+function mulligan(S){
+  if(S.turn!==1||S.mull[S.cur]||legionsOf(S,S.cur).some(L=>L.moved))return 'No mulligan available.';
+  S.mull[S.cur]=true;S.roll=rnd(6);log(S,`${seatName(S,S.cur)} takes a mulligan and rolls ${S.roll}.`);
+}
+
+/* ---- movement ---- */
+function moveTargets(S,lid){
+  const L=S.legions[lid],out={};
+  if(!L||L.moved||S.phase!=='move'||L.owner!==S.cur)return out;
+  const at={};Object.values(S.legions).forEach(x=>{if(x.id!==lid)(at[x.land]=at[x.land]||[]).push(x)});
+  const enemy=l=>(at[l]||[]).some(x=>x.owner!==L.owner), own=l=>(at[l]||[]).some(x=>x.owner===L.owner);
+  // First step: if the land has a block, the legion must leave through it; otherwise any arch, arrow or arrows.
+  // Every later step must follow an arrow or arrows.
+  (function dfs(land,steps,first,seen){
+    if(steps===0){if(!own(land)&&land!==L.land)out[land]={tele:false};return}
+    let ex=LANDS[land].exits;
+    if(first){const bl=ex.filter(e=>e[1]===1);ex=bl.length?bl:ex.filter(e=>e[1]>=2)}
+    else ex=ex.filter(e=>e[1]>=3);
+    for(const [n] of ex){
+      if(seen.has(n))continue;
+      if(enemy(n)){if(steps===1&&!own(n))out[n]={tele:false};continue}
+      seen.add(n);dfs(n,steps-1,false,seen);seen.delete(n);
+    }
+  })(L.land,S.roll,true,new Set([L.land]));
+  if(S.roll===6&&!S.tele){
+    if(LANDS[L.land].terrain==='Tower'&&L.cre.some(isLord))TOWERS.forEach(t=>{if(t!==L.land&&!(at[t]||[]).length&&!out[t])out[t]={tele:true}});
+    if(L.cre.includes('Titan')&&S.seats[L.owner].score>=TITAN_TELEPORT)
+      LAND_IDS.forEach(l=>{if(enemy(l)&&!own(l)&&!out[l])out[l]={tele:true}});
+  }
+  return out;
+}
+function doMove(S,lid,dest){
+  const t=moveTargets(S,lid)[dest];if(!t)return 'That move is not legal.';
+  const L=S.legions[lid];L.from=L.land;L.land=dest;L.moved=true;L.tele=t.tele;if(t.tele)S.tele=true;
+  log(S,`${seatName(S,L.owner)} ${t.tele?'teleports':'moves'} ${lid} to ${LANDS[dest].terrain} ${LANDS[dest].label}.`);
+}
+function undoMove(S,lid){
+  const L=S.legions[lid];if(!L||!L.moved||S.phase!=='move')return 'Nothing to undo.';
+  L.land=L.from;L.moved=false;if(L.tele)S.tele=false;L.tele=false;
+}
+function anyMovable(S){return legionsOf(S,S.cur).some(L=>!L.moved&&Object.keys(moveTargets(S,L.id)).length)}
+function endMove(S){
+  const mine=legionsOf(S,S.cur);
+  if(!mine.some(L=>L.moved)&&anyMovable(S))return 'You must move at least one legion.';
+  // split legions that failed to separate are recombined
+  for(const A of mine)for(const B of mine)
+    if(A!==B&&S.legions[A.id]&&S.legions[B.id]&&A.land===B.land){A.cre=A.cre.concat(B.cre);A.moved=A.moved||B.moved;delete S.legions[B.id];log(S,`${B.id} could not separate and rejoins ${A.id}.`)}
+  S.phase='fight';afterEngagement(S);
+}
+function engagements(S){
+  const lands=new Set();
+  legionsOf(S,S.cur).forEach(L=>{if(legionsAt(S,L.land).some(x=>x.owner!==S.cur))lands.add(L.land)});
+  return [...lands];
+}
+function startEngagement(S,land){
+  if(S.phase!=='fight'||S.eng||S.post)return 'Not now.';
+  const here=legionsAt(S,land),att=here.find(x=>x.owner===S.cur),def=here.find(x=>x.owner!==S.cur);
+  if(!att||!def)return 'No engagement there.';
+  S.eng={land,att:att.id,def:def.id,stage:'decide'};
+  log(S,`${seatName(S,att.owner)} engages ${seatName(S,def.owner)} in ${LANDS[land].terrain} ${LANDS[land].label}.`);
+}
+function defenderDecide(S,flee){
+  const E=S.eng;if(!E||E.stage!=='decide')return 'Not now.';
+  const A=S.legions[E.att],D=S.legions[E.def];
+  if(flee){
+    if(D.cre.some(isLord))return 'A legion containing a Lord (Titan, Angel or Archangel) may not flee.';
+    const pts=Math.floor(legionValue(S,D)/2);
+    log(S,`${D.id} flees! ${seatName(S,A.owner)} scores ${pts}.`);
+    returnToCare(S,D.cre);delete S.legions[D.id];S.eng=null;
+    addPoints(S,A.owner,pts,A.id);afterEngagement(S);return;
+  }
+  const mk=(L,side)=>L.cre.map((c,i)=>({id:side+i,side,c,owner:L.owner,hex:null,hits:0,dead:false,dying:false,moved:false,struck:false}));
+  E.stage='battle';
+  E.battle={turn:1,side:'D',phase:'man',units:mk(D,'D').concat(mk(A,'A')),summoned:false,reinforced:false,terrain:LANDS[E.land].terrain,seq:A.cre.length+D.cre.length};
+  if(E.battle.terrain==='Tower'){const spots=['3-2','3-1','3-3','2-1','2-2','4-1','4-2'];E.battle.units.filter(u=>u.side==='D').forEach((u,i)=>{if(spots[i])u.hex=spots[i]})}
+  if(E.battle.terrain==='Tower')E.battle.side='A';
+  snapManeuver(E.battle);
+  log(S,E.battle.terrain==='Tower'?'Battle at the Tower! The defender holds the walls and skips its first maneuver.':`Battle in the ${E.battle.terrain}! The defender maneuvers first.`);
+}
+function afterEngagement(S){
+  if(S.status!=='play')return;
+  if(!S.seats[S.cur].alive){endTurn(S);return}
+  if(S.post)return;
+  if(S.phase==='fight'&&!S.eng&&!engagements(S).length)S.phase='muster';
+}
+
+/* ---- points, angels, elimination ---- */
+function addPoints(S,seat,pts,lid){
+  if(!S.seats[seat].alive||pts<=0)return;
+  const old=S.seats[seat].score,nw=old+pts;S.seats[seat].score=nw;
+  const L=lid&&S.legions[lid];
+  if(L)for(let k=Math.floor(old/100)+1;k<=Math.floor(nw/100);k++){
+    if(L.cre.length>=MAX_LEGION)break;
+    let a=(k*100)%500===0&&S.care.Archangel>0?'Archangel':'Angel';
+    if(S.care[a]<=0)continue;
+    L.cre.push(a);S.care[a]--;log(S,`${L.id} acquires an ${a}!`);
+  }
+}
+function eliminatePlayer(S,seat,killer,extra=0){
+  if(!S.seats[seat].alive)return;
+  let pts=extra;
+  legionsOf(S,seat).forEach(L=>{pts+=legionValue(S,L);returnToCare(S,L.cre);delete S.legions[L.id]});
+  S.seats[seat].alive=false;
+  log(S,`☠ ${seatName(S,seat)}'s Titan has fallen. ${seatName(S,seat)} is out of the game.`);
+  if(killer!=null&&S.seats[killer].alive)addPoints(S,killer,Math.floor(pts/2),null);
+  const alive=S.seats.map((s,i)=>s.alive?i:-1).filter(i=>i>=0);
+  if(alive.length<=1){S.status='over';S.winner=alive[0]??null;S.eng=null;
+    log(S,alive.length?`🏆 ${seatName(S,alive[0])} is the last Titan standing and wins!`:'All Titans have fallen. No one wins.')}
+}
+
+/* ---- muster ---- */
+function recruitOptions(S,L,terrain){
+  const t=terrain||LANDS[L.land].terrain;
+  if(L.cre.length>=MAX_LEGION)return [];
+  const cnt={};L.cre.forEach(c=>cnt[c]=(cnt[c]||0)+1);
+  const res=[];const tree=TREES[t];
+  if(t==='Tower'){
+    res.push('Centaur','Gargoyle','Ogre');
+    if(cnt.Guardian||Object.entries(cnt).some(([c,n])=>n>=3&&!isLord(c)))res.push('Guardian');
+    if(cnt.Titan||cnt.Warlock)res.push('Warlock');
+  }else tree.forEach(([c,need],k)=>{
+    let ok=cnt[c]>0;
+    if(!ok&&k>0&&(cnt[tree[k-1][0]]||0)>=need)ok=true;
+    if(!ok&&tree.slice(k+1).some(([h])=>cnt[h]))ok=true;
+    if(ok)res.push(c);
+  });
+  return res.filter(c=>S.care[c]>0);
+}
+function canMuster(S,L){return S.phase==='muster'&&L.owner===S.cur&&L.moved&&!L.rec&&recruitOptions(S,L).length>0}
+function doRecruit(S,lid,c){
+  const L=S.legions[lid];if(!L||!canMuster(S,L)||!recruitOptions(S,L).includes(c))return 'Cannot muster that.';
+  L.cre.push(c);S.care[c]--;L.rec=true;log(S,`${lid} musters a ${c} in the ${LANDS[L.land].terrain}.`);
+}
+function endTurn(S){
+  Object.values(S.legions).forEach(L=>{L.moved=false;L.rec=false;delete L.from;delete L.tele});
+  S.summonedThisTurn=false;S.post=null;
+  if(S.status!=='play')return;
+  let n=S.cur;
+  for(let i=0;i<S.seats.length;i++){n=(n+1)%S.seats.length;if(S.seats[n].alive)break}
+  if(n<=S.cur)S.turn++;
+  S.cur=n;S.phase='split';S.roll=null;S.tele=false;S.eng=null;
+  log(S,`— Turn ${S.turn}: ${seatName(S,n)} to play —`);
+}
+
+/* ================= BATTLE ================= */
+const occ=(B,h)=>B.units.find(u=>!u.dead&&u.hex===h);
+function enemyAdj(B,side,h){return HADJ[h].some(x=>{const o=occ(B,x);return o&&o.side!==side})}
+function engaged(B,u){return u.hex&&enemyAdj(B,u.side,u.hex)}
+function snapManeuver(B){B.snap=B.units.map(u=>[u.id,u.hex,u.moved])}
+function unitPower(S,u){return powerOf(S,u.owner,u.c)}
+function battleMoves(S,u){
+  const B=S.eng.battle;
+  if(B.phase!=='man'||u.side!==B.side||u.moved||u.dead)return [];
+  if(u.hex&&engaged(B,u))return [];
+  const sk=skillOf(u.c),fly=flies(u.c),T=B.terrain,dist={},res=new Set();
+  const passable=n=>(hazardAt(T,n)!=='volcano'||u.c==='Dragon')&&(fly||(!occ(B,n)&&canStand(T,u.c,n)));
+  const land=n=>!occ(B,n)&&canStand(T,u.c,n);
+  // 11.4: entering or crossing a hazard that slows counts as two hexes; fliers ignore it until they land
+  const cost=(n,from)=>(!fly&&mustStopIn(T,u.c,n,from))?2:1;
+  const landCost=n=>fly&&mustStopIn(T,u.c,n,null)?1:0; // 11.4: a flier slowed where it lands
+  const q=[];
+  if(u.hex){dist[u.hex]=0;q.push(u.hex)}
+  else HEX.filter(h=>h.c===entryCol(u.side)).forEach(h=>{if(!passable(h.id))return;const c=cost(h.id,null);if(c>sk)return;dist[h.id]=c;q.push(h.id)});
+  while(q.length){
+    q.sort((x,y)=>dist[x]-dist[y]);const h=q.shift();
+    if(h!==u.hex&&land(h)&&dist[h]+landCost(h)<=sk)res.add(h);
+    for(const n of HADJ[h]){
+      if(!passable(n))continue;const d=dist[h]+cost(n,h);
+      if(d>sk||(dist[n]!=null&&dist[n]<=d))continue;
+      dist[n]=d;q.push(n);
+    }
+  }
+  res.delete(u.hex);
+  return [...res];
+}
+function doBattleMove(S,uid,hex){
+  const B=S.eng.battle,u=B.units.find(x=>x.id===uid);
+  if(!u||!battleMoves(S,u).includes(hex))return 'Illegal move.';
+  u.hex=hex;u.moved=true;
+}
+function resetManeuver(S){
+  const B=S.eng.battle;if(B.phase!=='man')return;
+  B.snap.forEach(([id,hex,moved])=>{const u=B.units.find(x=>x.id===id);if(u&&!u.dead&&u.side===B.side){u.hex=hex;u.moved=moved}});
+  B.units.forEach(u=>{if(u.side===B.side&&!B.snap.some(s=>s[0]===u.id)){u.hex=null;u.moved=false}});
+}
+function strikeSide(B){return B.phase==='sb'?other(B.side):B.side}
+function strikeTargets(S,u){
+  const B=S.eng.battle;
+  if(!['str','sb'].includes(B.phase)||u.side!==strikeSide(B)||u.struck||u.dead||!u.hex)return [];
+  const melee=HADJ[u.hex].map(h=>occ(B,h)).filter(o=>o&&o.side!==u.side&&!o.dying);
+  if(melee.length)return melee.map(t=>({t:t.id,range:false}));
+  if(engaged(B,u))return []; // engaged, but every foe already slain
+  if(B.phase==='str'&&ranges(u.c)){
+    return B.units.filter(t=>!t.dead&&!t.dying&&t.hex&&t.side!==u.side&&HDIST[u.hex][t.hex]>1&&HDIST[u.hex][t.hex]+1<=Math.min(4,skillOf(u.c))&&(!isLord(t.c)||u.c==='Warlock')&&!rangeBlocked(B,u,t))
+      .map(t=>({t:t.id,range:true}));
+  }
+  return [];
+}
+function mustStrike(S){const B=S.eng.battle;return B.units.filter(u=>u.side===strikeSide(B)&&strikeTargets(S,u).some(x=>!x.range))}
+function anyStrike(S){const B=S.eng.battle;return B.units.some(u=>strikeTargets(S,u).length)}
+function doStrike(S,uid,tid){
+  const B=S.eng.battle,u=B.units.find(x=>x.id===uid),t=B.units.find(x=>x.id===tid);
+  const opt=u&&strikeTargets(S,u).find(x=>x.t===tid);if(!opt)return 'Illegal strike.';
+  const dice=strikeDice(S,B.terrain,u,t,opt.range),tn=strikeNumber(B.terrain,u,t,opt.range);
+  const rolls=Array.from({length:dice},()=>rnd(6)),hits=rolls.filter(r=>r>=tn).length;
+  const need=unitPower(S,t)-t.hits;t.hits+=hits;u.struck=true;
+  const kill=t.hits>=unitPower(S,t);if(kill)t.dying=true;
+  S.lastRoll={who:u.c,tgt:t.c,rolls,tn,hits,range:opt.range,kill};
+  log(S,`${u.c} ${opt.range?'rangestrikes':'strikes'} ${t.c}: ${dice} dice needing ${tn}+ → ${hits} hit${hits===1?'':'s'}${kill?' — slain!':''}`);
+  let extra=kill&&!opt.range?hits-need:0;
+  while(extra>0){
+    const c2=HADJ[u.hex].map(h=>occ(B,h)).filter(o=>o&&o.side!==u.side&&!o.dying&&o!==t&&strikeNumber(B.terrain,u,o,false)<=tn)
+      .sort((x,y)=>(unitPower(S,x)-x.hits)-(unitPower(S,y)-y.hits))[0];
+    if(!c2)break;
+    const left=unitPower(S,c2)-c2.hits,take=Math.min(extra,left);c2.hits+=take;extra-=take;
+    const k2=c2.hits>=unitPower(S,c2);if(k2)c2.dying=true;
+    log(S,`  ${take} hit${take===1?'':'s'} carr${take===1?'ies':'y'} over to ${c2.c}${k2?' — slain!':''}`);
+    S.lastRoll.carry=(S.lastRoll.carry||'')+` +${take} to ${c2.c}${k2?' (slain)':''}`;
+  }
+}
+function autoStrikes(S){
+  let guard=50;
+  while(guard--){
+    const u=mustStrike(S)[0];if(!u)break;
+    const opts=strikeTargets(S,u).filter(x=>!x.range);
+    // strike the most-damaged target first
+    const B=S.eng.battle;opts.sort((a,b)=>{const ta=B.units.find(x=>x.id===a.t),tb=B.units.find(x=>x.id===b.t);return (unitPower(S,ta)-ta.hits)-(unitPower(S,tb)-tb.hits)});
+    doStrike(S,u.id,opts[0].t);
+  }
+}
+function endManeuver(S){
+  const B=S.eng.battle;if(B.phase!=='man')return 'Not now.';
+  if(B.side==='A'&&B.summonWin)B.summonDone=true;   // 15.3: the summoning option is used or lost now
+  B.units.forEach(u=>{if(u.side===B.side&&!u.dead&&!u.hex){u.dead=true;log(S,`${u.c} failed to enter the battle and is lost.`)}});
+  if(checkBattleEnd(S))return;
+  B.phase='str';B.units.forEach(u=>u.struck=false);
+  B.units.forEach(u=>{if(!u.dead&&u.hex&&hazardAt(B.terrain,u.hex)==='drift'&&!isNative(u.c,'drift')){
+    u.hits++;log(S,`${u.c} suffers a hit from the drift.`);if(u.hits>=unitPower(S,u))u.dying=true}});
+  if(!anyStrike(S))endStrikes(S);
+}
+function endStrikes(S){
+  const B=S.eng.battle;
+  if(mustStrike(S).length)return 'Every engaged creature must strike.';
+  if(B.phase==='str'){
+    B.phase='sb';B.units.forEach(u=>u.struck=false);
+    if(!anyStrike(S))endStrikes(S);
+    return;
+  }
+  // end of strikeback: remove the slain
+  B.units.forEach(u=>{if(u.dying&&!u.dead){u.dead=true;u.dying=false;if(u.side==='D'&&!B.summonDone)B.summonWin=true;log(S,`${u.c} (${u.side==='A'?'attacker':'defender'}) is removed.`)}});
+  if(checkBattleEnd(S))return;
+  B.units.forEach(u=>{u.moved=false;u.struck=false});
+  if(B.side==='D'){B.side='A'}
+  else{B.turn++;B.side='D';
+    if(B.turn>BATTLE_TURNS){log(S,'Time runs out — the attacking legion is destroyed (time-loss: the defender scores nothing).');finishBattle(S,'D','time');return}}
+  B.phase='man';snapManeuver(B);
+}
+function checkBattleEnd(S){
+  const B=S.eng.battle;
+  const a=B.units.some(u=>u.side==='A'&&!u.dead),d=B.units.some(u=>u.side==='D'&&!u.dead);
+  const tA=B.units.some(u=>u.side==='A'&&u.c==='Titan'&&u.dead),tD=B.units.some(u=>u.side==='D'&&u.c==='Titan'&&u.dead);
+  if(tA||tD){finishBattle(S,tA&&tD?null:tA?(d?'D':null):(a?'A':null),'titan');return true}
+  if(a&&d)return false;
+  finishBattle(S,a?'A':d?'D':null,a||d?'kill':'mutual');return true;
+}
+function concede(S,side){finishBattle(S,other(side),'concede')}
+function summonOptions(S){
+  const E=S.eng,B=E.battle;if(!B||B.side!=='A'||B.phase!=='man'||B.summoned||!B.summonWin||B.summonDone||S.summonedThisTurn)return [];
+  if(B.units.filter(u=>u.side==='A'&&!u.dead).length>=MAX_LEGION)return [];
+  const A=S.legions[E.att],out=[];
+  legionsOf(S,A.owner).forEach(L=>{if(L.id===E.att||legionsAt(S,L.land).some(x=>x.owner!==L.owner))return;
+    ['Angel','Archangel'].forEach(c=>{if(L.cre.includes(c))out.push({lid:L.id,c})})});
+  return out;
+}
+function doSummon(S,lid,c){
+  const B=S.eng.battle;if(!summonOptions(S).some(o=>o.lid===lid&&o.c===c))return 'Cannot summon.';
+  const L=S.legions[lid];L.cre.splice(L.cre.indexOf(c),1);
+  B.units.push({id:'A'+(B.seq++),side:'A',c,owner:L.owner,hex:null,hits:0,dead:false,dying:false,moved:false,struck:false,from:lid});
+  B.summoned=true;B.summonDone=true;S.summonedThisTurn=true;log(S,`An ${c} is summoned from ${lid}! It must enter this maneuver.`);
+  if(!L.cre.length)delete S.legions[lid];
+}
+function reinforceOptions(S){
+  const E=S.eng,B=E.battle;if(!B||B.side!=='D'||B.phase!=='man'||B.turn!==4||B.reinforced)return [];
+  const alive=B.units.filter(u=>u.side==='D'&&!u.dead).map(u=>u.c);
+  const fake={cre:alive,land:E.land,owner:S.legions[E.def].owner};
+  return recruitOptions(S,fake);
+}
+function doReinforce(S,c){
+  const B=S.eng.battle;if(!reinforceOptions(S).includes(c))return 'Cannot reinforce.';
+  S.care[c]--;B.units.push({id:'D'+(B.seq++),side:'D',c,owner:S.legions[S.eng.def].owner,hex:null,hits:0,dead:false,dying:false,moved:false,struck:false});
+  B.reinforced=true;log(S,`The defender is reinforced by a ${c}! It must enter this maneuver.`);
+}
+function finishBattle(S,win,reason){
+  const E=S.eng,B=E.battle,A=S.legions[E.att],D=S.legions[E.def];
+  const L={A,D},owner={A:A.owner,D:D.owner};
+  const titanDead={A:B.units.some(u=>u.side==='A'&&u.c==='Titan'&&u.dead),D:B.units.some(u=>u.side==='D'&&u.c==='Titan'&&u.dead)};
+  const val=u=>valueOf(S,u.owner,u.c);
+  let pts=0;const setAside={A:0,D:0};
+  if(win&&reason!=='time'){const lose=other(win);
+    // 19.3: when a Titan falls, only the characters slain so far score; survivors are set aside (19.4: half points, no Angels)
+    pts=B.units.filter(u=>u.side===lose&&(reason!=='titan'||u.dead)).reduce((a,u)=>a+val(u),0);}
+  ['A','D'].forEach(side=>{if(titanDead[side])setAside[side]=B.units.filter(u=>u.side===side&&!u.dead).reduce((a,u)=>a+val(u),0)});
+  B.units.forEach(u=>{if((u.dead||u.side!==win)&&u.c!=='Titan')S.care[u.c]++});
+  ['A','D'].forEach(side=>{
+    if(side===win){L[side].cre=B.units.filter(u=>u.side===side&&!u.dead).map(u=>u.c)}
+    else delete S.legions[L[side].id];
+  });
+  const msg={kill:'destroys',concede:'accepts the surrender of',time:'outlasts',titan:'slays the Titan of',mutual:''}[reason];
+  if(win)log(S,`${seatName(S,owner[win])}'s ${L[win].id} ${msg} ${seatName(S,owner[other(win)])}'s ${L[other(win)].id} and scores ${pts}.`);
+  else log(S,reason==='titan'?'The Titan falls, but the slaying legion perished too — no points are scored.':'Both legions are destroyed — mutual annihilation.');
+  S.eng=null;S.lastRoll=null;
+  if(win)addPoints(S,owner[win],pts,L[win].id);
+  ['A','D'].forEach(side=>{
+    const lostTitan=titanDead[side]||(side!==win&&L[side].cre.includes('Titan'));
+    if(lostTitan)eliminatePlayer(S,owner[side],owner[other(side)],setAside[side]);
+  });
+  // 14 / 15.3: after the battle the defender may take a reinforcement it never got; the attacker may summon an Angel
+  if(S.status==='play'&&win&&S.legions[L[win].id]&&S.seats[owner[win]].alive){
+    const W=S.legions[L[win].id];
+    if(win==='D'&&!B.reinforced&&!(reason==='concede'&&!B.units.some(u=>u.side==='A'&&(u.hex||u.dead)))&&recruitOptions(S,W).length)
+      S.post={kind:'reinforce',lid:W.id,owner:W.owner};
+    else if(win==='A'&&!S.summonedThisTurn&&W.cre.length<MAX_LEGION&&postSummonSources(S,W).length)
+      S.post={kind:'summon',lid:W.id,owner:W.owner};
+  }
+  afterEngagement(S);
+}
+function postSummonSources(S,W){const out=[];
+  legionsOf(S,W.owner).forEach(L=>{if(L.id===W.id||legionsAt(S,L.land).some(x=>x.owner!==L.owner))return;
+    ['Angel','Archangel'].forEach(c=>{if(L.cre.includes(c))out.push({lid:L.id,c})})});return out}
+function postOptions(S){const P=S.post;if(!P)return [];const W=S.legions[P.lid];if(!W)return [];
+  return P.kind==='reinforce'?recruitOptions(S,W).map(c=>({c})):postSummonSources(S,W)}
+function postChoose(S,i){const P=S.post,o=postOptions(S)[i];if(!o)return 'Not available.';const W=S.legions[P.lid];
+  if(P.kind==='reinforce'){W.cre.push(o.c);S.care[o.c]--;log(S,`${W.id} musters a ${o.c} after its victory.`)}
+  else{const src=S.legions[o.lid];src.cre.splice(src.cre.indexOf(o.c),1);if(!src.cre.length)delete S.legions[o.lid];
+    W.cre.push(o.c);S.summonedThisTurn=true;log(S,`${W.id} summons an ${o.c} from ${o.lid} after its victory.`)}
+  S.post=null;afterEngagement(S)}
+function postSkip(S){S.post=null;afterEngagement(S)}
+//#LOGIC-END
+
+/* ================= ART ================= */
+const TER={
+  Plains:{c:'#f1df4e',d:'#b9a21c',g:'plains'}, Woods:{c:'#8fe486',d:'#4fa648',g:'woods'},
+  Brush:{c:'#b5b64a',d:'#7d7e22',g:'brush'}, Marsh:{c:'#9a62bb',d:'#5f3478',g:'marsh'},
+  Hills:{c:'#9c7259',d:'#644330',g:'hills'}, Desert:{c:'#f2893a',d:'#b9541b',g:'desert'},
+  Jungle:{c:'#3ea38a',d:'#1c6a56',g:'jungle'}, Swamp:{c:'#3f8fe6',d:'#1f58a8',g:'swamp'},
+  Mountains:{c:'#d63a4c',d:'#8a1d2a',g:'mountains'}, Tundra:{c:'#c4f0f4',d:'#82bfc8',g:'tundra'},
+  Tower:{c:'#ebe8e3',d:'#a9a49c',g:'tower'}};
+const CRE_COL={};
+(function(){for(const t in TREES)for(const [c] of TREES[t])if(!CRE_COL[c]&&t!=='Tower')CRE_COL[c]=darken(TER[t].d,.3);
+  Object.assign(CRE_COL,{Titan:'#7a1f1a',Angel:'#8a6a1a',Archangel:'#8a5a10',Guardian:'#4d4a46',Warlock:'#4b2b6a',Centaur:'#6a5a20',Gargoyle:'#4c5620',Ogre:'#5b3a1b'})})();
+const GLYPHS={
+  plains:'<path d="M-9 6l2-8 2 8M-1 6l2-11 2 11M7 6l2-7 2 7" stroke="#6b5420" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+  woods:'<g fill="#1f3a15"><path d="M-7 7l5-14 5 14z"/><path d="M1 8l5-16 5 16z" transform="translate(-1 0)"/></g><path d="M-2 7v3M5 8v3" stroke="#3a2614" stroke-width="1.5"/>',
+  brush:'<g fill="#4b5521"><circle cx="-6" cy="3" r="4"/><circle cx="1" cy="0" r="5"/><circle cx="7" cy="4" r="3.5"/></g>',
+  marsh:'<path d="M-10 7h20M-7 10h14" stroke="#2f4a4a" stroke-width="1.4"/><path d="M-4 6v-11M0 6v-14M4 6v-9" stroke="#3c4e25" stroke-width="1.4"/><ellipse cx="0" cy="-9" rx="1.4" ry="3" fill="#5a3a1c"/>',
+  hills:'<path d="M-12 7Q-6 -7 0 7Q6 -5 12 7" fill="#7a4f26" stroke="#4e3015" stroke-width="1"/>',
+  desert:'<circle cx="6" cy="-6" r="3.5" fill="#f6dc8e"/><path d="M-12 7Q-4 -1 3 7M-2 7Q5 1 12 7" stroke="#9b7334" stroke-width="1.6" fill="none"/>',
+  jungle:'<path d="M0 9V-3" stroke="#3a2614" stroke-width="2"/><path d="M0 -3Q-8 -9 -12 -2M0 -3Q8 -9 12 -2M0 -3Q-4 -12 -9 -11M0 -3Q4 -12 9 -11" stroke="#0e3a1b" stroke-width="2.2" fill="none"/>',
+  swamp:'<path d="M-10 7h20M-6 10h12" stroke="#22302a" stroke-width="1.4"/><path d="M-2 7V-7M-2 -3l-5 -4M-2 -1l5 -5" stroke="#2b2015" stroke-width="1.6" fill="none"/>',
+  mountains:'<path d="M-13 9L-4 -9L1 0L5 -5L13 9Z" fill="#5e3022"/><path d="M-4 -9L-7 -3L-4 -4L-1 -3Z M5 -5L3 -2L5 -2.6L7 -2Z" fill="#f2ece4"/>',
+  tundra:'<g stroke="#5f7f8c" stroke-width="1.5"><path d="M0 -9V9M-8 -4.5L8 4.5M-8 4.5L8 -4.5"/></g>',
+  reeds:'<g stroke="#3d2512" stroke-width="1.6" stroke-linecap="round" fill="none"><path d="M-6 10Q-6 0 -9 -8M0 10V-11M6 10Q6 0 9 -7"/></g><g fill="#3d2512"><ellipse cx="-9" cy="-9" rx="1.6" ry="3.2"/><ellipse cx="0" cy="-12" rx="1.8" ry="3.6"/><ellipse cx="9" cy="-8" rx="1.6" ry="3.2"/></g>',
+  tower:'<path d="M-9 10V-4h3v-4h3v4h2v-4h3v4h2v-4h3v4h2V10z" fill="#5d574f" stroke="#2c2924" stroke-width="1"/><rect x="-2" y="3" width="4" height="7" fill="#2a2015"/>'
+};
+const EMBLEM=['◆','✚','❖','☀','◉','♜'];
+function chitHTML(c,opts={}){
+  const p=opts.power??CRE[c][0],sk=CRE[c][1],ink=CRE_COL[c]||'#333';
+  const col=opts.owner!=null&&S&&S.seats[opts.owner]?COLORS[S.seats[opts.owner].color]:null;
+  const head=c==='Titan'?`<div class="ban" style="background:${col?col.c:'#7a1f1a'}">${col?EMBLEM[S.seats[opts.owner].color]:''} TITAN</div>`:`<div class="nm" style="color:${ranges(c)?'#a3241b':'#2a1d12'}">${c.toUpperCase()}</div>`;
+  return `<div class="chit ${opts.cls||''}" ${opts.attrs||''} style="${opts.border?'--b:'+opts.border:''}" title="${c} — power ${p}, skill ${sk}${flies(c)?', flies':''}${ranges(c)?', rangestrikes':''}">
+    ${head}${opts.hits?`<span class="hit">${opts.hits}</span>`:''}
+    <svg class="art" viewBox="-15 -15 30 30"><use href="#c-art" /><text y="7" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="19" fill="${ink}">${c[0]}</text></svg>
+    ${ranges(c)?'<span class="bow">➶</span>':''}${flies(c)?'<span class="wing">⟆</span>':''}
+    <div class="ps" style="color:${ink}"><span>${c==='Titan'?'*'+p:p}</span><span>${sk}</span></div></div>`;
+}
+const SVG_DEFS=`<defs>
+  <filter id="paint" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="3" seed="7"/><feDisplacementMap in="SourceGraphic" scale="3.5"/></filter>
+  <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="2"/><feColorMatrix values="0 0 0 0 .2 0 0 0 0 .13 0 0 0 0 .05 0 0 0 .32 0"/></filter>
+  <filter id="mottle"><feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="4" seed="11"/><feColorMatrix values="0 0 0 0 .25 0 0 0 0 .16 0 0 0 0 .06 0 0 0 .55 -.12"/></filter>
+  <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="marble" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".004 .009" numOctaves="5" seed="4"/><feColorMatrix values="0 0 0 0 .45 0 0 0 0 .05 0 0 0 0 .07 1.6 0 0 0 -.55"/></filter>
+  <filter id="stone"><feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="4" seed="9"/><feColorMatrix values="0 0 0 .55 .45 0 0 0 .55 .45 0 0 0 .55 .45 0 0 0 0 1"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+  <filter id="parch"><feTurbulence type="fractalNoise" baseFrequency=".02" numOctaves="4" seed="21"/><feColorMatrix values="0 0 0 0 .55 0 0 0 0 .38 0 0 0 0 .18 0 0 0 .5 -.05"/></filter>
+  <symbol id="c-art" viewBox="-15 -15 30 30" overflow="visible"><circle r="13" fill="none" stroke="#b08a4a" stroke-width=".8" stroke-dasharray="1.5 1.5"/><circle r="10.5" fill="rgba(176,138,74,.12)"/></symbol>
+  <radialGradient id="chitG" cx="30%" cy="25%" r="85%"><stop offset="0%" stop-color="#fffaea"/><stop offset="60%" stop-color="#f1e2bd"/><stop offset="100%" stop-color="#ddc38c"/></radialGradient>
+  <radialGradient id="vign"><stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#1a0d04" stop-opacity=".55"/></radialGradient>
+  <radialGradient id="centerG"><stop offset="0%" stop-color="#f4e6c4"/><stop offset="100%" stop-color="#c9ad78"/></radialGradient>
+  ${Object.entries(TER).map(([k,t])=>`<radialGradient id="t-${k}" cx="45%" cy="40%" r="75%"><stop offset="0%" stop-color="${lighten(t.c,.25)}"/><stop offset="65%" stop-color="${t.c}"/><stop offset="100%" stop-color="${t.d}"/></radialGradient>`).join('')}
+  ${Object.entries(GLYPHS).map(([k,g])=>`<symbol id="g-${k}" viewBox="-15 -15 30 30" overflow="visible">${g}</symbol>`).join('')}
+</defs>`;
+function darken(hex,a){const n=parseInt(hex.slice(1),16);return '#'+[n>>16,n>>8&255,n&255].map(v=>Math.round(v*(1-a)).toString(16).padStart(2,'0')).join('')}
+function lighten(hex,a){const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;r+=(255-r)*a;g+=(255-g)*a;b+=(255-b)*a;return '#'+[r,g,b].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('')}
+</script>
+<script>
+/* ================= GEOMETRY ================= */
+const SC=1.3,DEG=Math.PI/180,TR=26.5,TT=.235;
+const bx=x=>(x-170)*SC, by=y=>(y+25)*SC;
+function landC(id){const L=LANDS[id];return [bx(L.x),by(L.y)]}
+function tilePts(id,shrink=0){
+  const L=LANDS[id],[cx,cy]=landC(id),r=(TR-shrink)*SC,sg=L.up?1:-1;
+  const V=[[0,-2*r],[Math.sqrt(3)*r,r],[-Math.sqrt(3)*r,r]].map(([a,b])=>[cx+a,cy+sg*b]);
+  const pts=[];for(let i=0;i<3;i++){const v=V[i],pr=V[(i+2)%3],nx=V[(i+1)%3];
+    pts.push([v[0]+(pr[0]-v[0])*TT,v[1]+(pr[1]-v[1])*TT],[v[0]+(nx[0]-v[0])*TT,v[1]+(nx[1]-v[1])*TT])}
+  return pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+}
+function exitMark(fromId,toId,type){
+  const [x1,y1]=landC(fromId),[x2,y2]=landC(toId),mx=(x1+x2)/2,my=(y1+y2)/2,ang=Math.atan2(y2-y1,x2-x1)/DEG;
+  const tri='<path d="M-3.2,-3.4L3.2,0L-3.2,3.4Z" fill="#f4eee0"/>';
+  if(type===4)return `<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})" pointer-events="none"><rect x="-5" y="-14" width="10" height="28" rx="2" fill="#120c08"/>${[-8.5,0,8.5].map(o=>`<g transform="translate(0,${o})">${tri}</g>`).join('')}</g>`;
+  // single marks sit at this land's end of the border
+  const side=fromId<toId?1:-1;
+  const sym=type===3?tri:type===2?'<path d="M-3,3V0A3,3 0 0 1 3,0V3" fill="none" stroke="#f4eee0" stroke-width="1.6" transform="rotate(90)"/>':'<rect x="-2.6" y="-2.6" width="5.2" height="5.2" fill="#f4eee0"/>';
+  return `<g transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)}) translate(0,${(side*13).toFixed(1)})" pointer-events="none"><rect x="-5.5" y="-5.5" width="11" height="11" rx="2" fill="#120c08"/>${sym}</g>`;
+}
+
+/* ================= APP STATE ================= */
+let db=null,user=null,me=null,mode='lobby',S=null,V=0,gameId=null,unsubGame=null,unsubLobby=null,games=[],names={},busy=false;
+let sel={legion:null,unit:null},local=false,lobbyLoaded=false;
+const $=s=>document.querySelector(s);
+const clone=o=>JSON.parse(JSON.stringify(o));
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3200)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function mySeats(){if(!S||!S.seats)return [];return local?S.seats.map((_,i)=>i):S.seats.map((s,i)=>s.uid===me?i:-1).filter(i=>i>=0)}
+function myTurn(){const a=actor(S);return a!=null&&mySeats().includes(a)}
+function pname(i){
+  const s=S.seats[i];const col=s.color!=null?COLORS[s.color].n:'Seat '+(i+1);
+  if(local)return col;
+  const n=s.name||names[s.uid];return n?`${n} (${col})`:col;
+}
+async function loadNames(uids){
+  if(!user||!user.profiles)return;const need=uids.filter(u=>u&&!(u in names));if(!need.length)return;
+  try{const ps=await user.profiles(need);need.forEach(u=>names[u]=(ps&&ps[u]&&ps[u].name)||'');render()}catch(e){}
+}
+
+/* ---------- peer-to-peer online play (no accounts) ----------
+   The host's browser keeps the authoritative game. Others connect to it with a room code
+   through the free PeerJS relay; every move is sent to the host, checked against the
+   current version, and broadcast back to everyone. */
+const PREFIX='titan-fanweb-v1-';
+let peer=null,conns=[],hostConn=null,isHost=false,room=null,retryT=null,pending=null;
+const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+me=ls.get('titan-uid')||('u'+Math.random().toString(36).slice(2,10));ls.set('titan-uid',me);
+const myName=()=>ls.get('titan-name')||'';
+function syncNames(){if(S&&S.seats)S.seats.forEach(s=>{if(s.uid&&s.name)names[s.uid]=s.name})}
+function persistHost(){if(isHost)ls.set('titan-host',{room,S,V,t:Date.now()})}
+function broadcast(){conns.forEach(c=>{try{if(c.open)c.send({t:'state',S,V})}catch(e){}})}
+async function act(fn){
+  if(busy)return;
+  const S2=clone(S);const err=fn(S2);
+  if(typeof err==='string'){toast(err);return}
+  if(local){S=S2;render();return}
+  if(isHost){if(S.status==='play'){const a=actor(S);if(a==null||S.seats[a].uid!==me){toast('It is not your turn.');return}}
+    S=S2;V++;syncNames();persistHost();broadcast();render();return}
+  if(!hostConn||!hostConn.open){toast('Not connected to the host — reconnecting…');return}
+  busy=true;pending=setTimeout(()=>{busy=false;toast('The host did not answer. Try again.')},8000);
+  hostConn.send({t:'commit',S:S2,base:V});
+}
+function adoptState(nS,nV,reject){clearTimeout(pending);busy=false;S=nS;V=nV;syncNames();
+  if(reject)toast(reject==='turn'?'It is not your turn.':'The game changed before your move landed. Showing the latest — try again.');render()}
+function onHostMsg(c,d){
+  if(!d||!d.t)return;
+  if(d.t==='hello'){c.uid=d.uid;
+    if(S.status==='lobby'){let seat=S.seats.find(s=>s.uid===d.uid)||S.seats.find(s=>!s.uid);
+      if(seat){seat.uid=d.uid;seat.name=(d.name||'Player').slice(0,24);V++;persistHost()}}
+    else{const seat=S.seats.find(s=>s.uid===d.uid);if(seat&&d.name){seat.name=d.name.slice(0,24)}}
+    syncNames();broadcast();render();return}
+  if(d.t==='commit'){
+    if(d.base!==V){try{c.send({t:'state',S,V,reject:true})}catch(e){}return}
+    // only the seat whose turn it is (or the host-run lobby) may change the game
+    const a=actor(S),seat=a!=null?S.seats[a]:null;
+    if(S.status==='play'&&(!seat||seat.uid!==c.uid)){try{c.send({t:'state',S,V,reject:'turn'})}catch(e){}return}
+    S=d.S;V++;syncNames();persistHost();broadcast();render();return}
+}
+function setupPeer(id,onOpen){
+  if(typeof Peer==='undefined'){toast('Online play needs an internet connection (the connection library did not load).');return false}
+  peer=id?new Peer(id):new Peer();
+  peer.on('open',onOpen);
+  peer.on('error',e=>{
+    if(e.type==='unavailable-id')toast('That room code is in use — try again in a minute, or host a new game.');
+    else if(e.type==='peer-unavailable'){toast('No game found with that code (is the host online?).');if(!isHost)scheduleRetry()}
+    else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'){toast('Connection trouble — retrying…');if(!isHost)scheduleRetry()}
+    else toast('Connection error: '+e.type)});
+  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
+  return true;
+}
+function hostGame(n,resume){
+  local=false;isHost=true;
+  if(resume){room=resume.room;S=resume.S;V=resume.V}
+  else{room=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+    S=newLobby(n,me);S.seats[0].uid=me;S.seats[0].name=myName()||'Host';V=1}
+  syncNames();persistHost();mode='game';sel={};render();
+  setupPeer(PREFIX+room,()=>{toast('Hosting room '+room);render()});
+  peer&&peer.on('connection',c=>{conns.push(c);
+    c.on('data',d=>onHostMsg(c,d));
+    c.on('open',()=>{try{c.send({t:'state',S,V})}catch(e){}});
+    c.on('close',()=>{conns=conns.filter(x=>x!==c);render()});});
+}
+function joinRoom(code){
+  local=false;isHost=false;room=code.toUpperCase().trim();ls.set('titan-room',room);
+  mode='game';S=null;sel={};render();
+  const go=()=>{
+    hostConn=peer.connect(PREFIX+room,{reliable:true});
+    hostConn.on('open',()=>{clearTimeout(retryT);hostConn.send({t:'hello',uid:me,name:myName()||'Player'})});
+    hostConn.on('data',d=>{if(d&&d.t==='state')adoptState(d.S,d.V,d.reject)});
+    hostConn.on('close',()=>{if(mode==='game'){toast('Lost the host — reconnecting…');scheduleRetry()}});
+  };
+  if(peer&&peer.open)go();else setupPeer(null,go);
+}
+function scheduleRetry(){clearTimeout(retryT);retryT=setTimeout(()=>{if(mode==='game'&&!isHost&&peer&&!peer.destroyed){
+  hostConn=peer.connect(PREFIX+room,{reliable:true});
+  hostConn.on('open',()=>{hostConn.send({t:'hello',uid:me,name:myName()||'Player'})});
+  hostConn.on('data',d=>{if(d&&d.t==='state')adoptState(d.S,d.V,d.reject)});
+  hostConn.on('close',()=>{if(mode==='game')scheduleRetry()});}},3000)}
+function backToLobby(){try{peer&&peer.destroy()}catch(e){}peer=null;conns=[];hostConn=null;isHost=false;clearTimeout(retryT);mode='lobby';S=null;local=false;render()}
+$('#btnLobby').onclick=backToLobby;
+
+/* ================= LOBBY ================= */
+function renderLobby(){
+  $('#btnLobby').style.display='none';$('#hdrInfo').textContent='';
+  const saved=ls.get('titan-host'),lastRoom=ls.get('titan-room')||'',hashRoom=(location.hash.match(/^#room-([A-Z0-9]+)/i)||[])[1]||'';
+  $('#main').innerHTML=`<div class="lobby parch">
+    <h2>The Lands of Titan</h2>
+    <p>Lead your Titan and its legions across the Masterboard, muster ever-mightier creatures, and crush your rivals on the battlelands. The last Titan standing wins.</p>
+    <div class="row"><span class="cinzel">Your name</span><input id="myName" maxlength="24" value="${esc(myName())}" placeholder="e.g. Sam" style="font:inherit;padding:5px 8px;border:1px solid #9c7a4a;border-radius:4px;background:#fffaf0"></div>
+    <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Host an online game</h3>
+    <div class="row"><select id="nPlayers">${[2,3,4,5,6].map(n=>`<option ${n===4?'selected':''}>${n}</option>`).join('')}</select><span>players</span><button id="btnHost">Host game</button>
+      ${saved&&saved.S?`<button class="alt" id="btnResume">Resume hosted game ${esc(saved.room)} (turn ${saved.S.turn||'—'})</button>`:''}</div>
+    <p class="muted" style="font-size:14.5px">You'll get a 5-letter room code. Send your friends this game file (or its web address, if you've put it online) and the code. No accounts needed. Keep your browser open while you play: your browser runs the game.</p>
+    <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Join a friend's game</h3>
+    <div class="row"><input id="roomCode" maxlength="5" value="${esc(hashRoom||lastRoom)}" placeholder="ROOM" style="font:inherit;font-family:Cinzel;letter-spacing:.2em;width:110px;padding:5px 8px;border:1px solid #9c7a4a;border-radius:4px;background:#fffaf0;text-transform:uppercase"><button id="btnJoin">Join</button></div>
+    <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Hotseat (one screen)</h3>
+    <div class="row"><select id="nLocal">${[2,3,4,5,6].map(n=>`<option ${n===2?'selected':''}>${n}</option>`).join('')}</select><span>players</span><button class="alt" id="btnLocal">Play hotseat</button></div>
+    ${rulesHTML()}
+  </div>`;
+  const saveName=()=>ls.set('titan-name',$('#myName').value.trim().slice(0,24));
+  $('#myName').onchange=saveName;
+  $('#btnLocal').onclick=()=>{local=true;S=newLobby(+$('#nLocal').value,'local');S.seats.forEach((s,i)=>s.uid='local'+i);startGame(S);V=0;mode='game';sel={};render()};
+  $('#btnHost').onclick=()=>{saveName();if(!myName())return toast('Enter your name first.');if(saved&&saved.S&&saved.S.status==='play')return confirmBox('Hosting a new game will replace your saved hosted game. Continue?',()=>hostGame(+$('#nPlayers').value));hostGame(+$('#nPlayers').value)};
+  const r=$('#btnResume');if(r)r.onclick=()=>{saveName();hostGame(0,saved)};
+  $('#btnJoin').onclick=()=>{saveName();const c=$('#roomCode').value.trim();if(!myName())return toast('Enter your name first.');if(c.length<5)return toast('Enter the 5-letter room code.');joinRoom(c)};
+}
+/* ================= MODALS ================= */
+function modal(html,setup){
+  const root=$('#modalRoot');root.innerHTML=`<div class="modalBg"><div class="modal parch">${html}</div></div>`;
+  const close=()=>root.innerHTML='';root.querySelector('.modalBg').onclick=e=>{if(e.target.classList.contains('modalBg'))close()};
+  setup&&setup(root,close);return close;
+}
+function confirmBox(msg,yes){modal(`<p>${esc(msg)}</p><div class="row"><button id="mY">Yes</button><button class="alt" id="mN">Cancel</button></div>`,(r,close)=>{r.querySelector('#mY').onclick=()=>{close();yes()};r.querySelector('#mN').onclick=close})}
+
+function splitModal(lid){
+  const L=S.legions[lid];const picked=new Set();
+  const draw=(r)=>{
+    r.querySelector('#spA').innerHTML=L.cre.map((c,i)=>picked.has(i)?'':chitHTML(c,{cls:'pick',attrs:`data-i="${i}"`,power:powerOf(S,L.owner,c)})).join('');
+    r.querySelector('#spB').innerHTML=L.cre.map((c,i)=>picked.has(i)?chitHTML(c,{cls:'pick',attrs:`data-i="${i}"`,power:powerOf(S,L.owner,c)}):'').join('')||'<span class="muted">Click creatures to move them here</span>';
+    r.querySelectorAll('[data-i]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;picked.has(i)?picked.delete(i):picked.add(i);draw(r)});
+    const n=picked.size;r.querySelector('#spOk').disabled=n<2||L.cre.length-n<2||(L.cre.length===8&&n!==4);
+  };
+  modal(`<h2>Split legion ${lid}</h2>
+    <p class="muted">${L.cre.length===8?'Your starting legion must split into two legions of four. Tip: keep the Titan and the Angel apart.':'Each new legion needs at least two creatures.'}</p>
+    <div class="cinzel" style="font-size:13px">${lid} keeps</div><div class="chits" id="spA" style="min-height:62px;margin:4px 0 10px"></div>
+    <div class="cinzel" style="font-size:13px">New legion</div><div class="chits" id="spB" style="min-height:62px;margin:4px 0 12px"></div>
+    <div class="row"><button id="spOk">Split</button><button class="alt" id="spX">Cancel</button></div>`,(r,close)=>{
+      draw(r);r.querySelector('#spX').onclick=close;
+      r.querySelector('#spOk').onclick=()=>{close();act(S2=>doSplit(S2,lid,[...picked]))};
+    });
+}
+function pickModal(title,items,cb,note=''){
+  modal(`<h2>${esc(title)}</h2>${note?`<p class="muted">${note}</p>`:''}<div class="chits">${items.map((it,i)=>`<div style="text-align:center">${chitHTML(it.c,{cls:'pick',attrs:`data-k="${i}"`})}<div style="font-size:12px">${esc(it.sub||'')}</div></div>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><button class="alt" id="pkX">Cancel</button></div>`,(r,close)=>{
+      r.querySelector('#pkX').onclick=close;r.querySelectorAll('[data-k]').forEach(e=>e.onclick=()=>{close();cb(items[+e.dataset.k])});
+    });
+}
+
+/* ================= RENDER: GAME ================= */
+function render(){
+  if(mode==='lobby'){renderLobby();return}
+  $('#btnLobby').style.display='';
+  if(!S){$('#main').innerHTML='<div class="lobby parch"><p class="muted">Loading game…</p></div>';return}
+  if(S.status==='lobby'){renderWaiting();return}
+  const inBattle=S.eng&&S.eng.stage==='battle';
+  $('#hdrInfo').textContent=`Turn ${S.turn}`+(local?' · hotseat':'');
+  $('#main').innerHTML=`<div id="boardWrap">${inBattle?battleSVG():boardSVG()}${inBattle?trayHTML():''}</div><div id="side">${sideHTML()}</div>`;
+  wire();
+  if(S.eng&&S.eng.stage==='decide'&&myTurn()&&!$('#modalRoot').innerHTML)decideModal();
+}
+function renderWaiting(){
+  $('#hdrInfo').textContent=room?'Room '+room:'';
+  const seated=S.seats.filter(s=>s.uid).length;
+  $('#main').innerHTML=`<div class="lobby parch"><h2>Gathering the Titans</h2>
+    <p style="font-size:20px">Room code: <b class="cinzel" style="letter-spacing:.25em;font-size:26px;color:var(--blood)">${esc(room||'')}</b>
+      <button class="alt" id="wCopy" style="margin-left:8px">Copy invite</button></p>
+    <p class="muted">${isHost?'Send friends the game file and this code. They choose "Join" and type it in. No accounts needed.':'Connected. Waiting for the host to start…'}</p>
+    <p>${seated} of ${S.seats.length} seats filled.</p>
+    <div class="chits" style="gap:10px">${S.seats.map(s=>`<div class="seatTag" style="background:${s.uid?'#7a5a34':'#b8a586'};font-size:15px;padding:5px 12px">${s.uid?esc(s.name||'Player')+(s.uid===me?' (you)':''):'Open seat'}</div>`).join('')}</div>
+    <div class="row" style="margin-top:16px">
+      ${isHost?`<button id="wStart" ${seated<2?'disabled':''}>Start the game${seated<S.seats.length?' with '+seated:''}</button>`:''}
+    </div></div>`;
+  const cp=$('#wCopy');if(cp)cp.onclick=async()=>{const txt=`Join my Titan game! Open the Titan game file${/^https?:/.test(location.href)?' at '+location.href.split('#')[0]+'#room-'+room:''} and enter room code ${room}.`;
+    try{await navigator.clipboard.writeText(txt);toast('Invite copied')}catch(e){toast('Room code: '+room)}};
+  const st=$('#wStart');if(st)st.onclick=()=>act(S2=>{if(S2.seats.filter(s=>s.uid).length<2)return 'Need at least two players.';startGame(S2)});
+}
+
+function boardSVG(){
+  const inMove=S.phase==='move'&&!S.eng;
+  const tg=(inMove&&sel.legion&&S.legions[sel.legion])?moveTargets(S,sel.legion):{};
+  const engLands=S.phase==='fight'&&!S.eng?engagements(S):[];
+  let s=`<svg viewBox="0 0 1040 980" xmlns="http://www.w3.org/2000/svg">${SVG_DEFS}
+    <rect width="1040" height="980" fill="#5a0f12"/><rect width="1040" height="980" filter="url(#marble)"/>
+    <g filter="url(#paint)">`;
+  // dark board bed under the lands (black gaps)
+  for(const id of LAND_IDS)s+=`<polygon points="${tilePts(id,-6)}" fill="#0d0907" stroke="#0d0907" stroke-width="10" stroke-linejoin="round"/>`;
+  s+='</g>';
+  for(const id of LAND_IDS){const L=LANDS[id];
+    s+=`<polygon class="land" data-land="${id}" points="${tilePts(id,1.2)}" fill="url(#t-${L.terrain})" stroke="#2a1a10" stroke-width="2.5" stroke-linejoin="round"/>`;}
+  s+=`<g pointer-events="none" style="mix-blend-mode:multiply">${LAND_IDS.map(id=>`<polygon points="${tilePts(id,1.2)}" fill="#fff" filter="url(#stone)"/>`).join('')}</g>`;
+  for(const id of LAND_IDS){const L=LANDS[id],[cx,cy]=landC(id),sg=L.up?1:-1;
+    const sz=L.terrain==='Tower'?30:26;
+    s+=`<use href="#g-${TER[L.terrain].g}" x="${cx-sz/2}" y="${cy-sz/2-sg*6}" width="${sz}" height="${sz}" pointer-events="none"/>
+      <text x="${cx}" y="${cy+sg*17+3}" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="8.6" letter-spacing=".5" fill="#1d130b" opacity=".85" pointer-events="none">${L.terrain.toUpperCase()}</text>
+      <text x="${cx}" y="${cy-sg*24+3}" text-anchor="middle" font-family="Cinzel" font-weight="700" font-size="7.5" fill="#1d130b" opacity=".55" pointer-events="none">${L.label}</text>`;
+    if(L.terrain==='Tower'){const o=S.seats.findIndex(x=>x.tower===id);if(o>=0)s+=`<circle cx="${cx+15}" cy="${cy-sg*10}" r="5" fill="${COLORS[S.seats[o].color].c}" stroke="#000" pointer-events="none"/>`}
+  }
+  // exit markings
+  const done=new Set();
+  for(const id of LAND_IDS)for(const [to,t] of LANDS[id].exits){
+    if(t===4){const k=[id,to].sort().join();if(done.has(k))continue;done.add(k)}
+    s+=exitMark(id,to,t);
+  }
+  for(const id of Object.keys(tg))s+=`<polygon class="hl" points="${tilePts(id,1)}" fill="${tg[id].tele?'rgba(160,110,255,.3)':'rgba(255,240,150,.35)'}" stroke="#fff27a" stroke-width="4" pointer-events="none" filter="url(#glow)"/>`;
+  for(const id of engLands)s+=`<polygon class="hl" points="${tilePts(id,1)}" fill="rgba(200,40,30,.25)" stroke="#ff6a4a" stroke-width="4" pointer-events="none"/>`;
+  if(S.eng)s+=`<polygon points="${tilePts(S.eng.land,1)}" fill="none" stroke="#ff4a3a" stroke-width="5" pointer-events="none" filter="url(#glow)"/>`;
+  if(S.roll&&!S.eng&&S.phase!=='split')s+=`<g transform="translate(40,40)"><rect width="58" height="58" rx="10" fill="#fbf4e2" stroke="#2b1a0b" stroke-width="3"/><text x="29" y="42" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="34" fill="#2b1a0b">${S.roll}</text></g>`;
+  // legion markers
+  const byL={};Object.values(S.legions).forEach(L=>(byL[L.land]=byL[L.land]||[]).push(L));
+  for(const land in byL){const [cx,cy]=landC(land),ls=byL[land];
+    ls.forEach((L,k)=>{const x=cx+(k-(ls.length-1)/2)*16,y=cy+(LANDS[land].up?3:-3);
+      const col=COLORS[S.seats[L.owner].color].c,isSel=sel.legion===L.id,own=canSee(L);
+      s+=`<g data-leg="${L.id}" style="cursor:pointer" transform="translate(${x-16},${y-16})">
+        <rect x="2" y="3" width="32" height="32" rx="4" fill="#000" opacity=".45"/>
+        <rect width="32" height="32" rx="4" fill="#f3ead2" stroke="${isSel?'#fff27a':'#120a04'}" stroke-width="${isSel?4:1.5}" ${isSel?'filter="url(#glow)"':''}/>
+        <rect x="3" y="3" width="26" height="26" rx="2" fill="${col}"/>
+        <text x="16" y="14" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="8" fill="#fff">${L.id}</text>
+        <text x="16" y="27" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="12" fill="#fff">${L.cre.length}</text>
+        ${L.cre.includes('Titan')&&own?'<circle cx="28" cy="4" r="4" fill="#ffd34a" stroke="#000"/>':''}
+        ${L.moved&&L.owner===S.cur?'<circle cx="4" cy="4" r="3.2" fill="#fff" stroke="#000"/>':''}</g>`});}
+  return s+'</svg>';
+}
+function actorOrCur(){return actor(S)??S.cur}
+function canSee(L){return S.status==='over'||(local?L.owner===actorOrCur():mySeats().includes(L.owner))}
+
+/* ---------- battle view ---------- */
+const BR=46,BX0=150,BY0=345;
+const hexXY=h=>[BX0+HEXBY[h].x*BR,BY0+HEXBY[h].y*BR];
+function hazardArt(T,h,x,y){
+  const z=hazardAt(T,h);if(!z)return '';
+  const poly=(r,f,st='none',sw=0,extra='')=>`<polygon points="${hexPts(x,y,r)}" fill="${f}" stroke="${st}" stroke-width="${sw}" ${extra} pointer-events="none"/>`;
+  const rnd=(i)=>{const v=Math.sin((x*13.1+y*7.7+i*3.3))*43758.5;return v-Math.floor(v)};
+  if(z==='bog')return `<g pointer-events="none" opacity=".85">${[[-14,-12],[12,-12],[-1,2],[-16,14],[12,14]].map(([dx,dy])=>`<use href="#g-reeds" x="${x+dx-9}" y="${y+dy-9}" width="18" height="18"/>`).join('')}</g>`;
+  if(z==='tree')return poly(44,'#4e2a2c','#3a1c1e',2)+`<g pointer-events="none" transform="translate(${x},${y})">${Array.from({length:14},(_,i)=>{const a=i*360/14;return `<ellipse cx="0" cy="-19" rx="3.2" ry="8" fill="#e9d2b0" transform="rotate(${a}) translate(0,${i%2?4:0})"/>`}).join('')}<circle r="5" fill="#e9d2b0"/></g>`;
+  if(z==='bramble')return `<g pointer-events="none" stroke="#3b2414" stroke-width="1.6" stroke-linecap="round">${Array.from({length:9},(_,i)=>{const dx=(rnd(i)-.5)*52,dy=(rnd(i+20)-.5)*48,a=rnd(i+40)*180;return `<g transform="translate(${x+dx},${y+dy}) rotate(${a})"><path d="M-9 0H9M-5 -5L5 5M-5 5L5 -5M5 0l3-4M-5 0l-3 4"/></g>`}).join('')}</g>`;
+  if(z==='sand')return `<g pointer-events="none" fill="#5a3a1c">${Array.from({length:140},(_,i)=>{const a=rnd(i)*6.283,r=Math.sqrt(rnd(i+300))*38;return `<circle cx="${(x+Math.cos(a)*r).toFixed(1)}" cy="${(y+Math.sin(a)*r).toFixed(1)}" r="${(0.8+rnd(i+600)).toFixed(1)}"/>`}).join('')}</g>`;
+  if(z==='drift')return `<g pointer-events="none" fill="none" stroke="#6b4320" stroke-width="1.1">${Array.from({length:7},(_,i)=>`<path d="M${x-36} ${y-24+i*8} q12 ${-6+rnd(i)*8} 24 0 t24 ${rnd(i+9)*6-3} t24 0"/>`).join('')}</g>`;
+  if(z==='hill'||z==='wall'||z==='keep'||z==='volcano'){
+    const top=z==='keep'||z==='volcano';
+    let g=poly(42,top?'rgba(255,248,225,.7)':'rgba(255,246,220,.5)')+poly(40,'none','#5b3d1f',6,'stroke-dasharray="2 3" opacity=".75"');
+    if(z==='wall'||z==='keep')g+=poly(46,'none','#3a2614',3,'stroke-dasharray="5 3"');
+    if(z==='volcano')g+=`<circle cx="${x}" cy="${y}" r="16" fill="#b23a1e" opacity=".8" pointer-events="none"/><circle cx="${x}" cy="${y}" r="8" fill="#ffb347" pointer-events="none"/>`;
+    return g;
+  }
+  return '';
+}
+function hexPts(x,y,r){return Array.from({length:6},(_,i)=>{const a=i*60*DEG;return (x+r*Math.cos(a)).toFixed(1)+','+(y+r*Math.sin(a)).toFixed(1)}).join(' ')}
+function battleSVG(){
+  const E=S.eng,B=E.battle,t=TER[B.terrain],A=myTurn();
+  const u=sel.unit&&B.units.find(x=>x.id===sel.unit);
+  const moves=u&&A?battleMoves(S,u):[],targets=u&&A?strikeTargets(S,u):[];
+  const att=S.legions[E.att],def=S.legions[E.def];
+  const BL=BATTLELANDS[B.terrain]||{};
+  let s=`<svg viewBox="0 0 640 700" xmlns="http://www.w3.org/2000/svg">${SVG_DEFS}
+    <rect width="640" height="700" fill="url(#t-${B.terrain})"/><rect width="640" height="700" fill="#fff" filter="url(#stone)" style="mix-blend-mode:multiply"/>
+    <rect width="640" height="700" fill="url(#vign)"/>
+    <g filter="url(#paint)"><path d="M42,92 L590,86 L604,610 L48,622 Z" fill="#e8cf9c"/></g>
+    <path d="M42,92 L590,86 L604,610 L48,622 Z" filter="url(#parch)" style="mix-blend-mode:multiply" pointer-events="none"/>
+    <path d="M42,92 q30,-8 60,4 q-40,6 -56,40 z" fill="#c9a96c" opacity=".8"/>
+    <text x="600" y="58" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="30" fill="#f6e7c3" stroke="#2a1608" stroke-width="1">${B.terrain}</text>
+    <use href="#g-${t.g}" x="570" y="62" width="26" height="26"/>
+    <text x="28" y="40" font-family="Cinzel" font-weight="900" font-size="16" fill="#f6e7c3" stroke="#2a1608" stroke-width=".6">Battle turn ${Math.min(B.turn,7)} of 7</text>
+    <text x="60" y="118" font-family="Cinzel" font-weight="700" font-size="12" fill="${COLORS[S.seats[def.owner].color].c}" stroke="#000" stroke-width=".3">◀ Defender: ${esc(pname(def.owner))}</text>
+    <text x="586" y="118" text-anchor="end" font-family="Cinzel" font-weight="700" font-size="12" fill="${COLORS[S.seats[att.owner].color].c}" stroke="#000" stroke-width=".3">Attacker: ${esc(pname(att.owner))} ▶</text>`;
+  for(const h of HEX){const [x,y]=hexXY(h.id);const entry=h.c===0||h.c===BCOLS.length-1;
+    const shade=['Hills','Mountains','Tower'].includes(B.terrain)&&!hazardAt(B.terrain,h.id)?'rgba(90,60,40,.32)':'rgba(255,250,235,.06)';
+    s+=`<polygon data-hex="${h.id}" points="${hexPts(x,y,BR-1)}" fill="${shade}" stroke="#5b3d1f" stroke-width="2" style="cursor:pointer"/>`;
+    s+=hazardArt(B.terrain,h.id,x,y);
+    if(entry)s+=`<polygon points="${hexPts(x,y,BR-7)}" fill="none" stroke="${h.c===0?COLORS[S.seats[def.owner].color].c:COLORS[S.seats[att.owner].color].c}" stroke-width="2" stroke-dasharray="4 4" opacity=".6" pointer-events="none"/>`;}
+  const kinds=Object.keys(BL).map(k=>k==='hill'?'slope':k).filter(k=>NATIVE[k]);
+  if(kinds.length)s+=`<g transform="translate(40,636)"><rect width="560" height="${18+kinds.length*16}" rx="4" fill="#1a120c" stroke="#c9a24a"/>${kinds.map((k,i)=>`<text x="10" y="${15+i*16}" font-family="Cinzel" font-weight="700" font-size="11" fill="#e9c66a">${{slope:'Slope',bog:'Bog',bramble:'Bramble',sand:'Sand',drift:'Drift',volcano:'Volcano'}[k]} natives:</text><text x="130" y="${15+i*16}" font-family="EB Garamond" font-size="12" fill="#f3e2b8">${NATIVE[k].join(', ')}</text>`).join('')}</g>`;
+  for(const h of moves){const [x,y]=hexXY(h);s+=`<polygon class="hl" points="${hexPts(x,y,BR-5)}" fill="rgba(255,226,122,.3)" stroke="#ffe27a" stroke-width="3" pointer-events="none"/>`}
+  for(const u2 of B.units){if(u2.dead||!u2.hex)continue;const [x,y]=hexXY(u2.hex);
+    const col=COLORS[S.seats[u2.owner].color].c,pw=unitPower(S,u2),isT=targets.find(q=>q.t===u2.id),isS=sel.unit===u2.id;
+    const canAct=A&&(battleMoves(S,u2).length||strikeTargets(S,u2).length);
+    s+=`<g data-unit="${u2.id}" style="cursor:pointer" transform="translate(${x-27},${y-27})" opacity="${u2.dying?.55:1}">
+      <rect x="2" y="3" width="54" height="54" rx="7" fill="#000" opacity=".4"/>
+      <rect width="54" height="54" rx="7" fill="url(#chitG)" stroke="${isS?'#ffe27a':isT?'#ff4a3a':col}" stroke-width="${isS||isT?4:3}" ${isS||isT?'filter="url(#glow)"':''}/>
+      ${u2.c==='Titan'?`<rect x="4" y="3" width="46" height="10" rx="2" fill="${col}"/><text x="27" y="11" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="7.5" fill="#fff">${EMBLEM[S.seats[u2.owner].color]} TITAN</text>`
+        :`<text x="27" y="11" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="6.6" fill="${ranges(u2.c)?'#a3241b':'#2a1d12'}">${u2.c.toUpperCase()}</text>`}
+      <circle cx="27" cy="29" r="12" fill="rgba(176,138,74,.15)" stroke="#b08a4a" stroke-width=".7" stroke-dasharray="1.5 1.5"/>
+      <text x="27" y="36" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="19" fill="${CRE_COL[u2.c]}">${u2.c[0]}</text>
+      ${ranges(u2.c)?'<text x="6" y="33" font-size="9" fill="#2a1d12">➶</text>':''}${flies(u2.c)?'<text x="44" y="33" font-size="9" fill="#2a1d12">⟆</text>':''}
+      <text x="5" y="51" font-family="Cinzel" font-weight="900" font-size="12" fill="${CRE_COL[u2.c]}">${u2.c==='Titan'?'*'+pw:pw}</text><text x="49" y="51" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="12" fill="${CRE_COL[u2.c]}">${skillOf(u2.c)}</text>
+      ${u2.hits?`<circle cx="47" cy="20" r="7.5" fill="#a8231a" stroke="#fff"/><text x="47" y="23.5" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff" font-family="Cinzel">${u2.hits}</text>`:''}
+      ${canAct&&!isS?'<circle cx="27" cy="-4" r="3.5" fill="#ffe27a"/>':''}
+      ${u2.dying?'<path d="M8 8L46 46M46 8L8 46" stroke="#a8231a" stroke-width="5"/>':''}</g>`;
+    if(isT)s+=`<text x="${x}" y="${y-31}" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="11" fill="#ffd2c8" stroke="#000" stroke-width=".5">${isT.range?'RANGE':'STRIKE'} ${strikeNumber(B.terrain,u,u2,isT.range)}+</text>`;
+  }
+  return s+'</svg>';
+}
+function trayHTML(){
+  const B=S.eng.battle,off=B.units.filter(u=>!u.dead&&!u.hex);if(!off.length)return '';
+  const part=side=>off.filter(u=>u.side===side).map(u=>chitHTML(u.c,{cls:'pick'+(sel.unit===u.id?' sel':''),attrs:`data-tray="${u.id}"`,power:unitPower(S,u),border:COLORS[S.seats[u.owner].color].c,owner:u.owner})).join('');
+  return `<div class="row" style="width:100%;max-width:640px;justify-content:space-between;margin-top:6px">
+    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Attacker waiting to enter (right edge)</div><div class="tray">${part('A')||'<span class="muted">—</span>'}</div></div>
+    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Defender waiting to enter (left edge)</div><div class="tray">${part('D')||'<span class="muted">—</span>'}</div></div></div>`;
+}
+
+/* ---------- side panel ---------- */
+function sideHTML(){
+  const a=actor(S),mine=myTurn();
+  let h=`<div class="parch card players"><h3>Players</h3>${S.seats.map((s,i)=>`<div class="p ${i===S.cur&&S.status==='play'?'cur':''} ${s.alive?'':'dead'}">
+      <span class="sw" style="background:${COLORS[s.color].c}"></span><span>${esc(pname(i))}${mySeats().includes(i)&&!local?' <i>(you)</i>':''}${!local&&isHost&&s.uid!==me&&!conns.some(c=>c.uid===s.uid&&c.open)?' <i title="not connected">⚠</i>':''}</span>
+      <span class="muted" style="font-size:13px">${legionsOf(S,i).length} leg.</span><span class="score">${s.score}</span></div>`).join('')}</div>`;
+  h+=`<div class="parch card">`;
+  if(S.status==='play'&&S.post){
+    const P=S.post,W=S.legions[P.lid],opts=postOptions(S);
+    h+=`<h3>After the battle</h3><p>${esc(pname(P.owner))}'s ${P.lid} may ${P.kind==='reinforce'?'muster the reinforcement it never received':'summon an Angel'}.</p>`;
+    h+=myTurn()?`<div class="chits">${opts.map((o,i)=>`<div style="text-align:center">${chitHTML(o.c,{cls:'pick',attrs:`data-post="${i}"`,owner:P.owner})}<div style="font-size:12px">${o.lid?'from '+o.lid:S.care[o.c]+' left'}</div></div>`).join('')}</div>
+      <div class="row" style="margin-top:8px"><button class="alt" id="bPostSkip">No thanks</button></div>`:'<p class="muted">Waiting for their choice…</p>';
+    h+='</div>';
+  }
+  else if(S.status==='over'){h+=`<h3>Game over</h3><p class="phase">${S.winner!=null?'🏆 '+esc(pname(S.winner))+' wins!':'No Titan survives.'}</p></div>`}
+  else if(S.eng&&S.eng.stage==='battle')h+=battlePanel()+'</div>';
+  else{
+    const phaseName={split:'Split',move:'Move',fight:'Engagements',muster:'Muster'}[S.phase];
+    h+=`<h3>${esc(pname(S.cur))} — ${phaseName}</h3>`;
+    if(S.eng&&S.eng.stage==='decide')h+=`<p>Waiting for <b>${esc(pname(a))}</b> to decide whether to fight or flee.</p>${mine?'<button id="bDecide">Decide</button>':''}`;
+    else if(!mine)h+=`<p class="muted">Waiting for ${esc(pname(a))}…</p>`;
+    else if(S.phase==='split'){
+      const big=legionsOf(S,S.cur).some(L=>L.cre.length>7);
+      h+=`<p>${big?'Split your starting legion into two legions of four (click it on the board).':'Click one of your legions to split it, or continue to movement.'}</p><div class="row"><button id="bEndSplit" ${big?'disabled':''}>Done splitting — roll</button></div>`;
+    }else if(S.phase==='move'){
+      const movable=anyMovable(S),any=legionsOf(S,S.cur).some(L=>L.moved);
+      h+=`<div class="row"><span class="die">${S.roll}</span><span>Click a legion, then a glowing land. ${S.roll===6?'<i>Sixes allow teleports (purple).</i>':''}</span></div>
+        <div class="row" style="margin-top:8px">${S.turn===1&&!S.mull[S.cur]&&!any?'<button class="alt" id="bMull">Mulligan (reroll)</button>':''}
+        <button id="bEndMove" ${!any&&movable?'disabled':''}>Done moving</button></div>
+        ${!movable&&!any?'<p class="muted">No legal moves this turn.</p>':''}`;
+    }else if(S.phase==='fight'){
+      const en=engagements(S);
+      h+=`<p>Choose an engagement to resolve:</p><div class="row">${en.map(l=>`<button data-eng="${l}">${LANDS[l].terrain} ${LANDS[l].label}</button>`).join('')}</div>`;
+    }else if(S.phase==='muster'){
+      const el=legionsOf(S,S.cur).filter(L=>canMuster(S,L));
+      h+=`<p>${el.length?'Muster one creature in each eligible legion that moved:':'No legion can muster this turn.'}</p>
+        <div class="row">${el.map(L=>`<button class="alt" data-mus="${L.id}">${L.id} · ${LANDS[L.land].terrain}</button>`).join('')}</div>
+        <div class="row" style="margin-top:8px"><button id="bEndTurn">End turn</button></div>`;
+    }
+    h+='</div>';
+  }
+  // selected legion
+  const L=sel.legion&&S.legions[sel.legion];
+  if(L&&!(S.eng&&S.eng.stage==='battle')){
+    const vis=canSee(L);
+    h+=`<div class="parch card"><h3>Legion ${L.id} · ${esc(pname(L.owner))}</h3>
+      <div class="muted" style="margin-bottom:6px">${LANDS[L.land].terrain} ${LANDS[L.land].label}${vis?' · worth '+legionValue(S,L)+' pts':''}</div>
+      ${vis?`<div class="chits">${L.cre.map(c=>chitHTML(c,{power:powerOf(S,L.owner,c),owner:L.owner})).join('')}</div>`:`<p>${L.cre.length} creatures, contents hidden.</p>`}
+      <div class="row" style="margin-top:8px">${legionButtons(L)}</div>
+      ${S.phase==='move'&&myTurn()&&L.owner===S.cur&&!L.moved?`<div id="destList">${destMusterHTML(L.id)}</div>`:''}</div>`;
+  }
+  h+=`<div class="parch card"><h3>Chronicle</h3><div class="log" id="log">${S.log.slice().reverse().map(m=>`<div>${esc(m)}</div>`).join('')}</div></div>`;
+  h+=`<div class="parch card legend">${rulesHTML()}</div>`;
+  return h;
+}
+let hoverLand=null;
+function destMusterHTML(lid){
+  const L=S.legions[lid],tg=moveTargets(S,lid),ids=Object.keys(tg);
+  if(!ids.length)return '<p class="muted">No legal moves for this legion.</p>';
+  const rows=ids.map(id=>{const T=LANDS[id].terrain,enemy=legionsAt(S,id).some(x=>x.owner!==L.owner);
+      const opts=recruitOptions(S,{cre:L.cre,land:id,owner:L.owner},T).sort((a,b)=>valueOf(S,L.owner,b)-valueOf(S,L.owner,a));
+      return {id,T,enemy,tele:tg[id].tele,opts,best:opts.length?valueOf(S,L.owner,opts[0]):-1}})
+    .sort((a,b)=>b.best-a.best);
+  return `<div class="cinzel" style="font-size:13px;margin:10px 0 4px;color:var(--bronze)">Where this legion can go — and what it could muster there</div>
+    ${rows.map(r=>`<div class="dest" data-dest="${r.id}" style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;cursor:pointer;${hoverLand===r.id?'background:rgba(255,226,122,.45);outline:1px solid #c9a24a':''}">
+      <span class="sw" style="background:${TER[r.T].c};border-color:#2a1a10"></span>
+      <span style="min-width:96px"><b>${r.T}</b> ${LANDS[r.id].label}${r.tele?' <i>(teleport)</i>':''}${r.enemy?' <b style="color:#8e2a1e">⚔ battle</b>':''}</span>
+      <span style="display:flex;gap:3px;flex-wrap:wrap">${r.opts.length?r.opts.map(c=>`<span class="mini" title="${c} ${CRE[c][0]}-${CRE[c][1]}" style="font-family:Cinzel;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px;background:#f3e6c4;border:1px solid #b59a68;color:${CRE_COL[c]}">${c}</span>`).join(''):`<span class="muted" style="font-size:13px">${L.cre.length>=MAX_LEGION?'legion full':'nothing'}</span>`}</span></div>`).join('')}
+    <div class="muted" style="font-size:12.5px;margin-top:4px">Click a row or a glowing land to move there.</div>`;
+}
+function legionButtons(L){
+  if(!myTurn()||L.owner!==S.cur||S.eng)return '';
+  let b='';
+  if(S.phase==='split'){
+    if(L.cre.length>=4)b+=`<button data-split="${L.id}">Split…</button>`;
+    legionsAt(S,L.land).filter(x=>x.owner===L.owner&&x.id!==L.id).forEach(x=>b+=`<button class="alt" data-merge="${x.id}">Merge ${x.id} back</button>`);
+  }
+  if(S.phase==='move'&&L.moved)b+=`<button class="alt" data-undo="${L.id}">Undo move</button>`;
+  return b;
+}
+function battlePanel(){
+  const E=S.eng,B=E.battle,mine=myTurn(),a=actor(S);
+  const sideName=s=>s==='A'?'Attacker':'Defender';
+  const ph={man:'Maneuver',str:'Strike',sb:'Strikeback'}[B.phase],ss=B.phase==='sb'?other(B.side):B.side;
+  let h=`<h3>Battle · ${sideName(ss)} ${ph}</h3><p><b>${esc(pname(a))}</b> ${mine?'(you) ':''}is acting.</p>`;
+  const lr=S.lastRoll;
+  if(lr)h+=`<div style="margin:6px 0"><div style="font-size:14px">${lr.who} → ${lr.tgt}${lr.range?' (range)':''}, need ${lr.tn}+: <b>${lr.hits} hit${lr.hits===1?'':'s'}</b>${lr.kill?' — slain!':''}${lr.carry?`<br><i>Carry-over:${esc(lr.carry)}</i>`:''}</div>
+    <div class="row" style="gap:3px;margin-top:3px">${lr.rolls.map(r=>`<span class="die sm ${r>=lr.tn?'hit':''}">${r}</span>`).join('')}</div></div>`;
+  if(!mine)return h+'<p class="muted">Waiting for their move…</p>';
+  if(B.phase==='man'){
+    h+=`<p>Click a creature (or one waiting to enter below the board), then a glowing hex. Creatures must stop when they move next to an enemy. Any creature not on the board when you finish is lost.</p>
+      <div class="row"><button id="bEndMan">Done maneuvering</button><button class="alt" id="bResetMan">Reset moves</button>
+      ${summonOptions(S).length?'<button class="alt" id="bSummon">Summon angel (now or never)</button>':''}
+      ${reinforceOptions(S).length?'<button class="alt" id="bReinf">Reinforce</button>':''}</div>`;
+  }else{
+    const must=mustStrike(S).length;
+    h+=`<p>${B.phase==='str'?'Your engaged creatures must strike an adjacent enemy. Unengaged rangestrikers may fire at range.':'Strike back with your engaged creatures (slain ones still strike back).'}</p>
+      <p class="muted">Strike number = 4 − striker skill + target skill (1–6). Dice = power; rangestrikes roll half.</p>
+      <div class="row"><button id="bEndStr" ${must?'disabled':''}>Done striking</button>${must?`<button class="alt" id="bAutoStr">Auto-strike (${must})</button>`:''}</div>`;
+  }
+  h+=`<div class="row" style="margin-top:10px"><button class="danger" id="bConcede">Concede battle</button></div>`;
+  return h;
+}
+function decideModal(){
+  const E=S.eng,A=S.legions[E.att],D=S.legions[E.def];
+  const canFlee=!D.cre.some(isLord);
+  modal(`<h2>Your legion ${D.id} is attacked!</h2>
+    <p>${esc(pname(A.owner))}'s legion ${A.id} (${A.cre.length} creatures) has entered the ${LANDS[E.land].terrain}.</p>
+    <div class="chits" style="margin-bottom:10px">${D.cre.map(c=>chitHTML(c,{power:powerOf(S,D.owner,c),owner:D.owner})).join('')}</div>
+    <p class="muted">Fleeing gives the attacker half your legion's points. A legion containing a Lord (Titan, Angel or Archangel) cannot flee.</p>
+    <div class="row"><button id="dFight">Fight!</button><button class="alt" id="dFlee" ${canFlee?'':'disabled'}>Flee</button><button class="alt" id="dLater">Look at the board</button></div>`,(r,close)=>{
+      r.querySelector('#dFight').onclick=()=>{close();act(S2=>defenderDecide(S2,false))};
+      r.querySelector('#dFlee').onclick=()=>{close();act(S2=>defenderDecide(S2,true))};
+      r.querySelector('#dLater').onclick=close;
+    });
+}
+
+/* ---------- wiring ---------- */
+function wireDest(){document.querySelectorAll('[data-dest]').forEach(r=>{r.onclick=()=>clickLand(r.dataset.dest);
+  r.onmouseenter=()=>{hoverLand=r.dataset.dest;document.querySelectorAll('.hl-peek').forEach(e=>e.remove());
+    const svg=document.querySelector('#boardWrap svg');if(svg){svg.insertAdjacentHTML('beforeend',`<polygon class="hl-peek" points="${tilePts(hoverLand,1)}" fill="rgba(255,255,255,.35)" stroke="#fff" stroke-width="5" pointer-events="none"/>`)}};
+  r.onmouseleave=()=>document.querySelectorAll('.hl-peek').forEach(e=>e.remove());})}
+function on(id,fn){const e=document.getElementById(id);if(e)e.onclick=fn}
+function wire(){
+  const inBattle=S.eng&&S.eng.stage==='battle';
+  if(!inBattle){
+    document.querySelectorAll('[data-leg]').forEach(g=>g.onclick=e=>{e.stopPropagation();clickLegion(g.dataset.leg)});
+    document.querySelectorAll('[data-land]').forEach(p=>{p.onclick=()=>clickLand(p.dataset.land);
+      p.onmouseenter=()=>{if(hoverLand===p.dataset.land)return;hoverLand=p.dataset.land;const d=document.getElementById('destList');if(d&&sel.legion){d.innerHTML=destMusterHTML(sel.legion);wireDest();const r=d.querySelector(`[data-dest="${hoverLand}"]`);if(r)r.scrollIntoView({block:'nearest'})}};});
+    wireDest();
+  }else{
+    document.querySelectorAll('[data-unit]').forEach(g=>g.onclick=e=>{e.stopPropagation();clickUnit(g.dataset.unit)});
+    document.querySelectorAll('[data-tray]').forEach(g=>g.onclick=()=>clickUnit(g.dataset.tray));
+    document.querySelectorAll('[data-hex]').forEach(p=>p.onclick=()=>clickHex(p.dataset.hex));
+  }
+  on('bEndSplit',()=>act(endSplit));on('bPostSkip',()=>act(postSkip));
+  document.querySelectorAll('[data-post]').forEach(b=>b.onclick=()=>act(S2=>postChoose(S2,+b.dataset.post)));on('bMull',()=>act(mulligan));
+  on('bEndMove',()=>{sel={};act(endMove)});on('bEndTurn',()=>{sel={};act(S2=>{endTurn(S2)})});
+  on('bDecide',decideModal);
+  document.querySelectorAll('[data-eng]').forEach(b=>b.onclick=()=>act(S2=>startEngagement(S2,b.dataset.eng)));
+  document.querySelectorAll('[data-split]').forEach(b=>b.onclick=()=>splitModal(b.dataset.split));
+  document.querySelectorAll('[data-merge]').forEach(b=>b.onclick=()=>act(S2=>doMerge(S2,sel.legion,b.dataset.merge)));
+  document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>act(S2=>undoMove(S2,b.dataset.undo)));
+  document.querySelectorAll('[data-mus]').forEach(b=>b.onclick=()=>{const L=S.legions[b.dataset.mus];
+    pickModal(`Muster for ${L.id} in the ${LANDS[L.land].terrain}`,recruitOptions(S,L).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doRecruit(S2,L.id,it.c)))});
+  on('bEndMan',()=>{sel={};act(endManeuver)});on('bResetMan',()=>act(resetManeuver));
+  on('bEndStr',()=>{sel={};act(endStrikes)});on('bAutoStr',()=>act(S2=>{autoStrikes(S2)}));
+  on('bConcede',()=>confirmBox('Concede this battle? Your legion will be destroyed and your opponent scores its full value.',()=>{const B=S.eng.battle;const side=B.phase==='sb'?other(B.side):B.side;sel={};act(S2=>concede(S2,side))}));
+  on('bSummon',()=>pickModal('Summon an angel',summonOptions(S).map(o=>({...o,sub:'from '+o.lid})),o=>act(S2=>doSummon(S2,o.lid,o.c)),'It joins the attacking legion permanently and must enter from the right edge this maneuver.'));
+  on('bReinf',()=>pickModal('Reinforce the defender',reinforceOptions(S).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doReinforce(S2,it.c)),'It enters from the left edge this maneuver.'));
+}
+function clickLegion(id){
+  const L=S.legions[id];
+  if(S.phase==='move'&&sel.legion&&S.legions[sel.legion]&&moveTargets(S,sel.legion)[L.land]&&L.owner!==S.cur){clickLand(L.land);return}
+  if(S.phase==='fight'&&myTurn()&&!S.eng&&engagements(S).includes(L.land)){act(S2=>startEngagement(S2,L.land));return}
+  sel.legion=sel.legion===id?null:id;
+  if(sel.legion&&myTurn()&&S.phase==='split'&&L.owner===S.cur&&L.cre.length===8)splitModal(id);
+  render();
+}
+function clickLand(land){
+  if(S.phase==='move'&&myTurn()&&sel.legion&&moveTargets(S,sel.legion)[land]){const id=sel.legion;sel={};act(S2=>doMove(S2,id,land));return}
+  const here=legionsAt(S,land);
+  if(here.length){const i=here.findIndex(x=>x.id===sel.legion);sel.legion=here[(i+1)%here.length].id;render()}
+  else if(sel.legion){sel={};render()}
+}
+function clickUnit(id){
+  const B=S.eng.battle,u=B.units.find(x=>x.id===id);
+  if(sel.unit&&myTurn()){const s=B.units.find(x=>x.id===sel.unit);
+    if(s&&strikeTargets(S,s).some(t=>t.t===id)){const sid=sel.unit;sel={};act(S2=>doStrike(S2,sid,id));return}}
+  sel.unit=sel.unit===id?null:id;render();
+}
+function clickHex(h){
+  const B=S.eng.battle;
+  if(sel.unit&&myTurn()){const u=B.units.find(x=>x.id===sel.unit);if(u&&battleMoves(S,u).includes(h)){const id=sel.unit;sel={};act(S2=>doBattleMove(S2,id,h));return}}
+  const o=occ(B,h);if(o){clickUnit(o.id);return}
+  sel={};render();
+}
+
+function rulesHTML(){
+  return `<details><summary>Rules at a glance</summary><div style="font-size:14.5px;line-height:1.4">
+  <p><b>Goal.</b> Be the last player with a living Titan.</p>
+  <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits:</b> on the first step a legion may leave through an arch (∩), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Every later step must follow single or triple arrows. A legion stops when it enters a land with an enemy → resolve engagements → muster one creature in each legion that moved.</p>
+  <p><b>Teleport.</b> On a 6, a legion with a Lord in a Tower may teleport to any empty Tower. With 400+ points, your Titan's legion may teleport onto any enemy legion. One teleport per turn.</p>
+  <p><b>Mustering.</b> Each terrain has a recruit tree. You may muster a creature if the legion already has one of it, has enough of the next-lower creature (number shown), or has a higher creature in that tree. Towers muster Centaur, Gargoyle or Ogre freely; a Guardian with three of one kind; a Warlock with your Titan.</p>
+  <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender (entering on the narrow left side) moves first, the attacker enters on the wide right side. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
+  <p><b>Scoring.</b> Win a battle to score the loser's full value (power × skill of each creature). Every 100 points earns an Angel, and every 500 an Archangel. Your Titan's power is 6 + 1 per 100 points. If your Titan dies, you're out.</p>
+  <table style="font-size:13px;border-collapse:collapse;width:100%">${Object.entries(TREES).map(([t,tr])=>`<tr><td style="padding:2px 6px 2px 0"><b>${t}</b></td><td>${tr.map(([c,n],i)=>(i?` →${n?n+'× ':''} `:'')+c).join('')}</td></tr>`).join('')}</table>
+  </div></details>`;
+}
+
+/* ================= BOOT ================= */
+render();
+if(/^#room-/i.test(location.hash)&&myName()){joinRoom(location.hash.slice(6))}
+window.addEventListener('beforeunload',e=>{if(isHost&&S&&S.status==='play'&&conns.length){e.preventDefault();e.returnValue=''}});
+</script>
+</body>
+</html>
