@@ -1204,6 +1204,15 @@ const BR=45,BCX=320,BCY=372;
 let BROT=0;   // set per render from the battle's rotation
 function hexXY(h){const H=HEXBY[h],x=(H.x-3.75)*BR,y=H.y*BR,a=BROT*DEG;
   return [BCX+x*Math.cos(a)+y*Math.sin(a),BCY-x*Math.sin(a)+y*Math.cos(a)]}
+// a small label above a creature standing on a hazard; ✓ = native there, otherwise the hazard applies to it
+const HAZ_COL={bog:'#3d5a2a',bramble:'#5b3a1c',sand:'#9a6a1f',drift:'#3f6f80',hill:'#7a5230',volcano:'#a8321e',wall:'#4d4a46',keep:'#4d4a46'};
+function hazardTag(T,u){
+  const z=hazardAt(T,u.hex);if(!z||z==='tree')return null;
+  const nk=z==='hill'?'slope':z,nat=NATIVE[nk]?isNative(u.c,nk):null;
+  const txt=({bog:'BOG',bramble:'BRAMBLE',sand:'SAND',drift:'DRIFT',hill:'SLOPE',volcano:'VOLCANO',wall:'WALL',keep:'TOWER TOP'}[z])+(nat===true?' ✓':'');
+  const w=Math.min(66,txt.length*6+12);
+  return (x,y)=>`<g pointer-events="none" transform="translate(${x},${y-33})"><rect x="${-w/2}" y="-7" width="${w}" height="13" rx="6.5" fill="${HAZ_COL[z]||'#333'}" stroke="${nat===true?'#9fe08a':'#f6e7c3'}" stroke-width="1.2"/><text y="3" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="8.4" fill="#fff">${txt}</text></g>`;
+}
 function hazardArt(T,h,x,y){
   const z=hazardAt(T,h);if(!z)return '';
   const poly=(r,f,st='none',sw=0,extra='')=>`<polygon points="${hexPts(x,y,r)}" fill="${f}" stroke="${st}" stroke-width="${sw}" ${extra} pointer-events="none"/>`;
@@ -1253,6 +1262,7 @@ function battleSVG(){
   const kinds=Object.keys(BL).map(k=>k==='hill'?'slope':k).filter(k=>NATIVE[k]);
   if(kinds.length)s+=`<g transform="translate(40,${700-24-kinds.length*16})"><rect width="560" height="${18+kinds.length*16}" rx="4" fill="#1a120c" stroke="#c9a24a"/>${kinds.map((k,i)=>`<text x="10" y="${15+i*16}" font-family="Cinzel" font-weight="700" font-size="11" fill="#e9c66a">${{slope:'Slope',bog:'Bog',bramble:'Bramble',sand:'Sand',drift:'Drift',volcano:'Volcano'}[k]} natives:</text><text x="130" y="${15+i*16}" font-family="EB Garamond" font-size="12" fill="#f3e2b8">${NATIVE[k].join(', ')}</text>`).join('')}</g>`;
   for(const h of moves){const [x,y]=hexXY(h);s+=`<polygon class="hl" points="${hexPts(x,y,BR-5)}" fill="rgba(255,226,122,.3)" stroke="#ffe27a" stroke-width="3" pointer-events="none"/>`}
+  let late='';
   for(const u2 of B.units){if(u2.dead||!u2.hex)continue;const [x,y]=hexXY(u2.hex);
     const col=COLORS[S.seats[u2.owner].color].c,pw=unitPower(S,u2),isT=targets.find(q=>q.t===u2.id),isS=sel.unit===u2.id;
     const canAct=A&&(battleMoves(S,u2).length||strikeTargets(S,u2).length);
@@ -1266,11 +1276,13 @@ function battleSVG(){
       ${ranges(u2.c)?'<text x="6" y="33" font-size="9" fill="#2a1d12">➶</text>':''}${flies(u2.c)?'<text x="44" y="33" font-size="9" fill="#2a1d12">⟆</text>':''}
       <text x="5" y="51" font-family="Cinzel" font-weight="900" font-size="12" fill="${CRE_COL[u2.c]}">${u2.c==='Titan'?'*'+pw:pw}</text><text x="49" y="51" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="12" fill="${CRE_COL[u2.c]}">${skillOf(u2.c)}</text>
       ${u2.hits?`<circle cx="47" cy="20" r="7.5" fill="#a8231a" stroke="#fff"/><text x="47" y="23.5" text-anchor="middle" font-size="9.5" font-weight="900" fill="#fff" font-family="Cinzel">${u2.hits}</text>`:''}
-      ${canAct&&!isS?'<circle cx="27" cy="-4" r="3.5" fill="#ffe27a"/>':''}
+      ${canAct&&!isS?'<circle cx="-4" cy="27" r="3.5" fill="#ffe27a" stroke="#5a3a10" stroke-width=".8"/>':''}
       ${u2.dying?'<path d="M8 8L46 46M46 8L8 46" stroke="#a8231a" stroke-width="5"/>':''}</g>`;
-    if(isT)s+=`<text x="${x}" y="${y-31}" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="11" fill="#ffd2c8" stroke="#000" stroke-width=".5">${isT.range?'RANGE':'STRIKE'} ${strikeNumber(B.terrain,u,u2,isT.range)}+</text>`;
+;{const tag=hazardTag(B.terrain,u2);if(tag)late=tag(x,y)+late}
+    if(isT){const t=`${isT.range?'RANGE':'STRIKE'} ${strikeNumber(B.terrain,u,u2,isT.range)}+`,w=t.length*7+12;
+      late+=`<g pointer-events="none" transform="translate(${x},${y+4})"><rect x="${-w/2}" y="-8" width="${w}" height="16" rx="4" fill="#7a1a12" stroke="#ffd2c8" stroke-width="1"/><text y="4" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="10.5" fill="#fff">${t}</text></g>`}
   }
-  return s+'</svg>';
+  return s+late+'</svg>';
 }
 function trayHTML(){
   const B=S.eng.battle,off=B.units.filter(u=>!u.dead&&!u.hex);if(!off.length)return '';
@@ -1368,7 +1380,7 @@ function battlePanel(){
   const E=S.eng,B=E.battle,mine=myTurn(),a=actor(S);
   const sideName=s=>s==='A'?'Attacker':'Defender';
   const ph={man:'Maneuver',str:'Strike',sb:'Strikeback'}[B.phase],ss=B.phase==='sb'?other(B.side):B.side;
-  let h=`<h3>Battle · ${sideName(ss)} ${ph}</h3><p><b>${esc(pname(a))}</b> ${mine?'(you) ':''}is acting.</p>`;
+  let h=`<h3>Battle · ${sideName(ss)} ${ph}</h3><p><b>${esc(pname(a))}</b> ${mine?'(you) ':''}is acting.</p><p class="muted" style="font-size:13px;margin:-4px 0 6px">A tag above a creature names the hazard it stands on; ✓ means it is a native there.</p>`;
   const lr=S.lastRoll;
   if(lr)h+=`<div style="margin:6px 0"><div style="font-size:14px">${lr.who} → ${lr.tgt}${lr.range?' (range)':''}, need ${lr.tn}+: <b>${lr.hits} hit${lr.hits===1?'':'s'}</b>${lr.kill?' — slain!':''}${lr.carry?`<br><i>Carry-over:${esc(lr.carry)}</i>`:''}</div>
     <div class="row" style="gap:3px;margin-top:3px">${lr.rolls.map(r=>`<span class="die sm ${r>=lr.tn?'hit':''}">${r}</span>`).join('')}</div></div>`;
