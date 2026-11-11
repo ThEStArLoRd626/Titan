@@ -81,6 +81,15 @@ main{flex:1;display:flex;gap:14px;padding:0 14px 14px;align-items:flex-start}
 .die.hit{background:#8e2a1e;color:#fff}
 .modalBg{position:fixed;inset:0;background:rgba(20,10,4,.6);display:flex;align-items:center;justify-content:center;z-index:20}
 .modal{max-width:560px;width:calc(100% - 30px);padding:18px 20px}
+.modal.wide{max-width:960px}
+table.ref{border-collapse:collapse;font-size:14.5px;margin:6px 0}
+table.ref th,table.ref td{border:1px solid rgba(90,70,50,.35);padding:3px 8px;text-align:center}
+table.ref th{background:rgba(185,133,67,.22);font-family:Cinzel;font-size:12px}
+.tchip{display:inline-block;padding:0 6px;border-radius:3px;font-family:Cinzel;font-size:11px;font-weight:700;color:#1d130b;border:1px solid rgba(0,0,0,.3)}
+.hzgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px}
+.hz{display:flex;gap:10px;font-size:14px;line-height:1.35;padding:8px;border:1px solid rgba(90,70,50,.25);border-radius:6px;background:rgba(255,250,235,.4)}
+.hz svg{flex:0 0 56px}
+
 .modal h2{margin:0 0 10px;color:var(--bronze);font-size:20px}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b1a0b;color:#f6dfae;padding:9px 16px;border-radius:6px;z-index:30;
   font-family:Cinzel;font-size:13px;box-shadow:var(--shadow)}
@@ -104,6 +113,7 @@ svg .hl{animation:pulse 1.2s ease-in-out infinite}
   <header>
     <h1>TITAN</h1><span class="sub">a fan-made web edition</span><span class="sp"></span>
     <span id="hdrInfo" class="cinzel" style="font-size:13px"></span>
+    <button class="alt" id="btnCharts">📜 Charts</button>
     <button class="alt" id="btnLobby" style="display:none">Lobby</button>
   </header>
   <main id="main"></main>
@@ -160,7 +170,27 @@ const BCOLS=[3,4,5,6,5,4], HEX=[], HEXBY={}, HADJ={}, HDIST={};
   HEX.forEach(a=>{HADJ[a.id]=HEX.filter(b=>b!==a&&Math.hypot(a.x-b.x,a.y-b.y)<1.8).map(b=>b.id)});
   HEX.forEach(a=>{const d={[a.id]:0},q=[a.id];while(q.length){const x=q.shift();for(const y of HADJ[x])if(d[y]==null){d[y]=d[x]+1;q.push(y)}}HDIST[a.id]=d});
 })();
-const entryCol=side=>side==='A'?BCOLS.length-1:0;
+// 10.1 entry sides. In the unturned grid the three wide (4-hex) sides face right, upper-left and lower-left
+// (outward normals 0°,120°,240°); the narrow (3-hex) side opposite each faces left, lower-right, upper-right.
+const BSIDES=[
+  {name:'right',     n:0,   hex:['5-0','5-1','5-2','5-3']},
+  {name:'upper-left',n:120, hex:['0-0','1-0','2-0','3-0']},
+  {name:'lower-left',n:240, hex:['0-2','1-3','2-4','3-5']},
+  {name:'left',      n:180, hex:['0-0','0-1','0-2']},
+  {name:'lower-right',n:300,hex:['3-5','4-4','5-3']},
+  {name:'upper-right',n:60, hex:['3-0','4-0','5-0']}];
+const OPPOSITE=[3,4,5,0,1,2];
+// a masterboard land points up or down; its three borders face these directions (degrees, counter-clockwise from east)
+const landDirs=id=>LANDS[id].up?[30,150,270]:[90,210,330];
+const battleRot=id=>LANDS[id].up?30:-30;      // turn the battleland so its wide sides face the land's borders
+const angDiff=(a,b)=>Math.abs(((a-b)%360+540)%360-180);
+const DIR_NAME={30:'upper right',90:'top',150:'upper left',210:'lower left',270:'bottom',330:'lower right'};
+function dirToward(from,to){const A=LANDS[from],B=LANDS[to];const a=Math.atan2(-(B.y-A.y),B.x-A.x)*180/Math.PI;
+  return landDirs(from).reduce((best,d)=>angDiff(d,a)<angDiff(best,a)?d:best)}
+function wideSideFor(land,dir){const rot=battleRot(land);let best=0;
+  [0,1,2].forEach(i=>{if(angDiff(BSIDES[i].n+rot,dir)<angDiff(BSIDES[best].n+rot,dir))best=i});return best}
+function entryHexes(B,side){const a=B.entryA??0;return BSIDES[side==='A'?a:OPPOSITE[a]].hex}
+const entryCol=null;
 // Battleland features, read from the battleland cards. Hex ids are "column-row" (columns 3-4-5-6-5-4).
 const BATTLELANDS={
   Plains:{},
@@ -307,8 +337,9 @@ function moveTargets(S,lid){
   const enemy=l=>(at[l]||[]).some(x=>x.owner!==L.owner), own=l=>(at[l]||[]).some(x=>x.owner===L.owner);
   // First step: if the land has a block, the legion must leave through it; otherwise any arch, arrow or arrows.
   // Every later step must follow an arrow or arrows.
-  (function dfs(land,steps,first,seen){
-    if(steps===0){if(!own(land)&&land!==L.land)out[land]={tele:false};return}
+  const add=(land,prev)=>{const d=dirToward(land,prev);const o=out[land]||(out[land]={tele:false,dirs:[]});if(!o.dirs.includes(d))o.dirs.push(d)};
+  (function dfs(land,steps,first,seen,prev){
+    if(steps===0){if(!own(land)&&land!==L.land)add(land,prev);return}
     // Board legend: starting, a block MUST be used (else any circle, arrow or triple arrows);
     // continuing, triple arrows MUST be followed if the land has them, otherwise a single arrow (no backtracking).
     let ex=LANDS[land].exits;
@@ -317,25 +348,28 @@ function moveTargets(S,lid){
     for(const [n] of ex){
       if(seen.has(n))continue;
       // 6.2 / 7.1: a move ends early on entering a land held by another player's legion (an engagement)
-      if(enemy(n)){if(!own(n))out[n]={tele:false};continue}
-      seen.add(n);dfs(n,steps-1,false,seen);seen.delete(n);
+      if(enemy(n)){if(!own(n))add(n,land);continue}
+      seen.add(n);dfs(n,steps-1,false,seen,land);seen.delete(n);
     }
-  })(L.land,S.roll,true,new Set([L.land]));
+  })(L.land,S.roll,true,new Set([L.land]),null);
   if(S.roll===6&&!S.tele){
-    if(LANDS[L.land].terrain==='Tower'&&L.cre.some(isLord))TOWERS.forEach(t=>{if(t!==L.land&&!(at[t]||[]).length&&!out[t])out[t]={tele:true}});
+    if(LANDS[L.land].terrain==='Tower'&&L.cre.some(isLord))TOWERS.forEach(t=>{if(t!==L.land&&!(at[t]||[]).length&&!out[t])out[t]={tele:true,dirs:[]}});
     if(L.cre.includes('Titan')&&S.seats[L.owner].score>=TITAN_TELEPORT)
-      LAND_IDS.forEach(l=>{if(enemy(l)&&!own(l)&&!out[l])out[l]={tele:true}});
+      LAND_IDS.forEach(l=>{if(enemy(l)&&!own(l)&&!out[l])out[l]={tele:true,dirs:landDirs(l).slice()}});  // 10.4: any wide side
   }
   return out;
 }
-function doMove(S,lid,dest){
+// entry: the border direction (degrees) the legion enters through; only matters when it attacks
+function doMove(S,lid,dest,entry){
   const t=moveTargets(S,lid)[dest];if(!t)return 'That move is not legal.';
+  if(entry!=null&&!t.dirs.includes(entry))return 'The legion cannot enter from that side.';
   const L=S.legions[lid];L.from=L.land;L.land=dest;L.moved=true;L.tele=t.tele;if(t.tele)S.tele=true;
+  L.entry=entry!=null?entry:(t.dirs[0]??null);
   log(S,`${seatName(S,L.owner)} ${t.tele?'teleports':'moves'} ${lid} to ${LANDS[dest].terrain} ${LANDS[dest].label}.`);
 }
 function undoMove(S,lid){
   const L=S.legions[lid];if(!L||!L.moved||S.phase!=='move')return 'Nothing to undo.';
-  L.land=L.from;L.moved=false;if(L.tele)S.tele=false;L.tele=false;
+  L.land=L.from;L.moved=false;if(L.tele)S.tele=false;L.tele=false;delete L.entry;
 }
 function anyMovable(S){return legionsOf(S,S.cur).some(L=>!L.moved&&Object.keys(moveTargets(S,L.id)).length)}
 function endMove(S){
@@ -371,6 +405,10 @@ function defenderDecide(S,flee){
   const mk=(L,side)=>L.cre.map((c,i)=>({id:side+i,side,c,owner:L.owner,hex:null,hits:0,dead:false,dying:false,moved:false,struck:false}));
   E.stage='battle';
   E.battle={turn:1,side:'D',phase:'man',units:mk(D,'D').concat(mk(A,'A')),summoned:false,reinforced:false,terrain:LANDS[E.land].terrain,seq:A.cre.length+D.cre.length};
+  // 10.1 / 10.2 / 10.4: choose the attacker's wide side; the defender enters on the narrow side opposite
+  const B0=E.battle;B0.rot=B0.terrain==='Tower'?-30:battleRot(E.land);
+  if(B0.terrain==='Tower')B0.entryA=[0,1,2].find(i=>(BSIDES[i].n-30+360)%360===210);   // always the lower-left, opposite the name
+  else B0.entryA=wideSideFor(E.land,A.entry!=null?A.entry:landDirs(E.land)[0]);
   if(E.battle.terrain==='Tower'){const spots=['3-2','3-1','3-3','2-1','2-2','4-1','4-2'];E.battle.units.filter(u=>u.side==='D').forEach((u,i)=>{if(spots[i])u.hex=spots[i]})}
   if(E.battle.terrain==='Tower')E.battle.side='A';
   snapManeuver(E.battle);
@@ -425,13 +463,29 @@ function recruitOptions(S,L,terrain){
   });
   return res.filter(c=>S.care[c]>0);
 }
+// why a legion can't muster right now (null = it can)
+function musterBlock(S,L){
+  if(!L.moved)return 'did not move this turn';
+  if(L.rec)return 'already mustered';
+  if(L.cre.length>=MAX_LEGION)return 'full (7 creatures)';
+  if(!recruitOptions(S,L).length)return 'nothing it qualifies for here';
+  return null}
+// 18.5: what a Tower legion still needs for each demi-lord (empty when qualified or none left)
+function towerHints(S,L){
+  if(LANDS[L.land].terrain!=='Tower')return [];
+  const cnt={};L.cre.forEach(c=>cnt[c]=(cnt[c]||0)+1);const out=[];
+  if(!(cnt.Titan||cnt.Warlock))out.push({c:'Warlock',why:'needs your Titan (or a Warlock) in this legion'});
+  else if(S.care.Warlock<=0)out.push({c:'Warlock',why:'none left in the supply'});
+  if(!(cnt.Guardian||Object.entries(cnt).some(([c,n])=>n>=3&&!isLord(c))))out.push({c:'Guardian',why:'needs three identical creatures (or a Guardian) in this legion'});
+  else if(S.care.Guardian<=0)out.push({c:'Guardian',why:'none left in the supply'});
+  return out}
 function canMuster(S,L){return S.phase==='muster'&&L.owner===S.cur&&L.moved&&!L.rec&&recruitOptions(S,L).length>0}
 function doRecruit(S,lid,c){
   const L=S.legions[lid];if(!L||!canMuster(S,L)||!recruitOptions(S,L).includes(c))return 'Cannot muster that.';
   L.cre.push(c);S.care[c]--;L.rec=true;log(S,`${lid} musters a ${c} in the ${LANDS[L.land].terrain}.`);
 }
 function endTurn(S){
-  Object.values(S.legions).forEach(L=>{L.moved=false;L.rec=false;delete L.from;delete L.tele});
+  Object.values(S.legions).forEach(L=>{L.moved=false;L.rec=false;delete L.from;delete L.tele;delete L.entry});
   S.summonedThisTurn=false;S.post=null;
   if(S.status!=='play')return;
   let n=S.cur;
@@ -459,7 +513,7 @@ function battleMoves(S,u){
   const landCost=n=>fly&&mustStopIn(T,u.c,n,null)?1:0; // 11.4: a flier slowed where it lands
   const q=[];
   if(u.hex){dist[u.hex]=0;q.push(u.hex)}
-  else HEX.filter(h=>h.c===entryCol(u.side)).forEach(h=>{if(!passable(h.id))return;const c=cost(h.id,null);if(c>sk)return;dist[h.id]=c;q.push(h.id)});
+  else entryHexes(B,u.side).map(id=>HEXBY[id]).forEach(h=>{if(!passable(h.id))return;const c=cost(h.id,null);if(c>sk)return;dist[h.id]=c;q.push(h.id)});
   while(q.length){
     q.sort((x,y)=>dist[x]-dist[y]);const h=q.shift();
     if(h!==u.hex&&land(h)&&dist[h]+landCost(h)<=sk)res.add(h);
@@ -882,6 +936,112 @@ function renderLobby(){
   const r=$('#btnResume');if(r)r.onclick=()=>{saveName();hostGame(0,saved)};
   $('#btnJoin').onclick=()=>{saveName();const c=$('#roomCode').value.trim();if(!myName())return toast('Enter your name first.');if(c.length<5)return toast('Enter the 5-letter room code.');joinRoom(c)};
 }
+/* ================= REFERENCE CHARTS ================= */
+const MUSTER_POS={Colossus:[350,46],Giant:[140,170],Hydra:[262,186],Dragon:[392,186],Serpent:[586,52],
+  Wyvern:[64,292],Unicorn:[262,292],Griffon:[456,306],Behemoth:[586,196],
+  Warbear:[150,412],Ranger:[268,412],Minotaur:[380,412],Gorgon:[668,320],Cyclops:[586,446],
+  Troll:[64,548],Ogre:[204,604],Centaur:[346,604],Lion:[470,524],Gargoyle:[586,604]};
+function terrainsOf(c){return Object.keys(TREES).filter(t=>t!=='Tower'&&TREES[t].some(([x])=>x===c))}
+function musterSVG(){
+  const W=94,H=58,P=MUSTER_POS;let lines='',labels='',boxes='',defs='';
+  const pairs={};
+  for(const t in TREES){if(t==='Tower')continue;const tr=TREES[t];
+    for(let k=1;k<tr.length;k++){const a=tr[k-1][0],b=tr[k][0],key=[a,b].sort().join();(pairs[key]=pairs[key]||[]).push({t,a,b,n:tr[k][1]})}}
+  for(const key in pairs){const list=pairs[key];
+    list.forEach((e,i)=>{const [x1,y1]=P[e.a],[x2,y2]=P[e.b],len=Math.hypot(x2-x1,y2-y1),nx=-(y2-y1)/len,ny=(x2-x1)/len,o=(i-(list.length-1)/2)*9;
+      const ax=x1+nx*o,ay=y1+ny*o,bx=x2+nx*o,by=y2+ny*o,col=TER[e.t].c;
+      lines+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#2a1d12" stroke-width="9" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>`;
+      const mx=(ax+bx)/2,my=(ay+by)/2;let ang=Math.atan2(by-ay,bx-ax)*180/Math.PI;if(ang>90)ang-=180;if(ang<-90)ang+=180;
+      labels+=`<text transform="translate(${mx+nx*(o>=0?11:-11)},${my+ny*(o>=0?11:-11)}) rotate(${ang})" text-anchor="middle" dy="3" font-family="Cinzel" font-weight="700" font-size="9.5" fill="#2a1d12">${e.t.toUpperCase()}</text>`;
+      const f=.30,lx=ax+(bx-ax)*f,ly=ay+(by-ay)*f;   // count sits near the lesser creature
+      labels+=`<g transform="translate(${lx+nx*(o>=0?13:-13)},${ly+ny*(o>=0?13:-13)})"><circle r="9" fill="#f6ead0" stroke="#2a1d12" stroke-width=".8"/><text text-anchor="middle" dy="3.5" font-family="Cinzel" font-weight="900" font-size="9.5" fill="#2a1d12">×${e.n}</text></g>`;
+    })}
+  for(const c in P){const [x,y]=P[c],ts=terrainsOf(c),id='mg-'+c;
+    defs+=`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${ts.map((t,i)=>`<stop offset="${(i/ts.length*100).toFixed(0)}%" stop-color="${TER[t].c}"/><stop offset="${((i+1)/ts.length*100).toFixed(0)}%" stop-color="${TER[t].c}"/>`).join('')}</linearGradient>`;
+    boxes+=`<g transform="translate(${x-W/2},${y-H/2})"><rect x="2" y="3" width="${W}" height="${H}" rx="5" fill="#000" opacity=".35"/>
+      <rect width="${W}" height="${H}" rx="5" fill="url(#${id})" stroke="#2a1d12" stroke-width="1.5"/>
+      <rect x="4" y="15" width="${W-8}" height="${H-19}" rx="3" fill="#f6ead0" opacity=".9"/>
+      <text x="${W/2}" y="11.5" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="10" fill="#1d130b">${c.toUpperCase()}</text>
+      <text x="${W/2}" y="40" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="20" fill="${CRE_COL[c]}">${c[0]}</text>
+      <text x="8" y="${H-6}" font-family="Cinzel" font-weight="900" font-size="13" fill="#1d130b">${CRE[c][0]}</text>
+      <text x="${W-8}" y="${H-6}" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="13" fill="#1d130b">${CRE[c][1]}</text>
+      <text x="${W/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="#1d130b">${ranges(c)?'➶':''}${flies(c)?'⟆':''}</text></g>`}
+  return `<svg viewBox="0 0 720 664" style="display:block;margin:0 auto;width:100%;max-height:72vh;background:#efe2c2;border-radius:6px"><defs>${defs}</defs>${lines}${labels}${boxes}
+    <text x="10" y="656" font-family="EB Garamond" font-size="12" fill="#2a1d12">➶ rangestrikes   ⟆ flies   ×N = how many of the lesser creature a legion needs to muster the greater one in that terrain</text></svg>`;
+}
+const STRIKE_TN=(a,d)=>Math.max(1,Math.min(6,4-a+d));
+function strikeTableHTML(){
+  return `<table class="ref"><tr><th rowspan="2">Defender's<br>skill</th><th colspan="5">Attacker's skill</th></tr><tr>${[1,2,3,4,5].map(a=>`<th>${a}</th>`).join('')}</tr>
+    ${[2,3,4].map(d=>`<tr><th>${d}</th>${[1,2,3,4,5].map(a=>`<td>${STRIKE_TN(a,d)}</td>`).join('')}</tr>`).join('')}</table>
+    <p class="muted" style="font-size:13.5px">Roll dice equal to the striker's power; each die showing the number or higher is a hit. A creature dies when its hits equal its power.</p>`;
+}
+function rangeHTML(){
+  const rs=Object.keys(CRE).filter(c=>ranges(c)).sort((a,b)=>CRE[b][0]-CRE[a][0]);
+  return `<table class="ref"><tr><th>Rangestriker</th><th>Strength (dice)</th><th>Skill</th><th>Furthest range</th></tr>
+    ${rs.map(c=>`<tr><td style="text-align:left">${c}</td><td>${Math.floor(CRE[c][0]/2)}</td><td>${CRE[c][1]}</td><td>${Math.min(4,CRE[c][1])}</td></tr>`).join('')}</table>
+    <svg viewBox="0 0 240 210" style="width:260px;max-width:100%;display:block;margin:8px 0">${(()=>{let g='';const R=16,cx=120,cy=105;
+      for(let q=-3;q<=3;q++)for(let r=-3;r<=3;r++){const d=Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r));if(d>3)continue;
+        const x=cx+R*1.5*q,y=cy+R*Math.sqrt(3)*(r+q/2);
+        g+=`<polygon points="${Array.from({length:6},(_,i)=>{const a=i*Math.PI/3;return (x+(R-1)*Math.cos(a)).toFixed(1)+','+(y+(R-1)*Math.sin(a)).toFixed(1)}).join(' ')}" fill="${d===0?'#c9a24a':d===1?'#e9d8b4':d===2?'#f6ead0':'#efdcb0'}" stroke="#5b3d1f"/>`;
+        if(d>0)g+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="11" fill="${d===1?'#a8231a':'#2a1d12'}">${d===1?'×':d+1}</text>`}
+      return g})()}</svg>
+    <ul style="font-size:14px;margin:4px 0 0 18px;padding:0">
+      <li>Range counts the striker's hex and the target's hex: one empty hex between them is range 3 (shown on the diagram from the gold hex).</li>
+      <li>Furthest range is 4, and never more than the striker's skill. At range 4 the striker loses 1 skill.</li>
+      <li>Only the moving player rangestrikes, only with creatures not in contact with an enemy, and never at an adjacent target (×).</li>
+      <li>Lords (Titan, Angel, Archangel) can't be rangestruck except by a Warlock.</li>
+      <li>Trees and creatures in between block the shot; a Warlock is never blocked or affected by hazards.</li></ul>`;
+}
+function characterHTML(){
+  const order=['Lords','Demi-lords','Creatures'],grp=c=>['Angel','Archangel','Titan'].includes(c)?'Lords':['Guardian','Warlock'].includes(c)?'Demi-lords':'Creatures';
+  const where=c=>c==='Guardian'||c==='Warlock'?'<span class="tchip" style="background:#ebe8e3">Tower</span>':terrainsOf(c).map(t=>`<span class="tchip" style="background:${TER[t].c}">${t}</span>`).join(' ');
+  return `<table class="ref"><tr><th style="text-align:left">Type</th><th>Power</th><th>Skill</th><th>Range strength</th><th>Flies</th><th>Value</th><th style="text-align:left">Mustered in</th></tr>
+    ${order.map(g=>`<tr><th colspan="7" style="text-align:left;color:var(--blood);background:none">${g.toUpperCase()}</th></tr>`+Object.keys(CRE).filter(c=>grp(c)===g).sort().map(c=>`<tr>
+      <td style="text-align:left">${c}</td><td>${c==='Titan'?'6+*':CRE[c][0]}</td><td>${CRE[c][1]}</td><td>${ranges(c)?Math.floor(CRE[c][0]/2):'–'}</td><td>${flies(c)?'Y':'–'}</td>
+      <td>${c==='Titan'?'*':CRE[c][0]*CRE[c][1]}</td><td style="text-align:left">${where(c)}</td></tr>`).join('')).join('')}</table>
+    <p class="muted" style="font-size:13px">*A Titan's power is 6 plus 1 for every 100 points its player has scored; its value is power × 4. Tower lands muster Centaurs, Gargoyles and Ogres freely, a Guardian with three identical creatures, and a Warlock with your Titan.</p>`;
+}
+const HAZARDS=[
+  {k:null,name:'Plain',nat:null,mv:'No effect.',st:'No effect.',rs:'No effect. Lighter hexes are higher ground.'},
+  {k:'tree',name:'Tree',nat:null,mv:'No non-flier may enter. A flier may cross but not stop on it.',st:'No effect.',rs:'Rangestrikes may not pass through a Tree.'},
+  {k:'bramble',name:'Bramble',nat:'bramble',mv:'Slows non-natives entering it (counts as two hexes).',st:'A native defending in Bramble is 1 harder to hit for a non-native. A non-native striking out of Bramble loses 1 skill.',rs:'A native defending in Bramble is 1 harder to hit by a non-native. A non-native loses 1 skill for each Bramble hex the shot crosses.'},
+  {k:'bog',name:'Bog',nat:'bog',mv:'Non-flying non-natives may not enter. A flying non-native may cross but not stop on it.',st:'No effect.',rs:'No effect.'},
+  {k:'sand',name:'Sand',nat:'sand',mv:'Slows non-flying non-natives entering it.',st:'No effect.',rs:'No effect.'},
+  {k:'drift',name:'Drift',nat:'drift',mv:'Slows non-natives entering it.',st:'A non-native takes 1 hit at the start of each strike phase it spends in a Drift (and may still strike if that kills it).',rs:'No effect.'},
+  {k:'hill',name:'Slope',nat:'slope',mv:'Slows non-flying non-natives moving up across a Slope.',st:'A native adds 1 die striking down a Slope. A non-native loses 1 skill striking up a Slope.',rs:'Raised ground can let shots pass over lower creatures (rule 12).'},
+  {k:'volcano',name:'Volcano',nat:'volcano',mv:'Only Dragons may enter, flying or not.',st:'A Dragon adds 2 dice striking from the Volcano (and 1 more striking down a Slope).',rs:'A Dragon in the Volcano is 1 harder to hit by rangestrikes, and adds 2 dice to its own rangestrikes.'},
+  {k:'wall',name:'Tower wall',nat:null,mv:'Slows any non-flier moving up across a Wall.',st:'Gain 1 skill striking down across a Wall; lose 1 striking up.',rs:'Lose 1 skill for each Wall the shot crosses going up.'},
+  {k:'dune',name:'Dune',nat:'sand',later:true,mv:'No effect.',st:'A native adds 2 dice striking down across a Dune; a non-native loses 1 die striking up across one.',rs:'Limits rangestrikes across Dunes.'},
+  {k:'cliff',name:'Cliff',nat:null,later:true,mv:'Non-fliers may not cross a Cliff.',st:'No striking across a Cliff; creatures on either side are not in contact.',rs:'May cross a Cliff only from atop it to a target not at its base (or the reverse).'}];
+function hazardIcon(k){
+  if(!k)return `<svg viewBox="-24 -24 48 48" width="56" height="56"><polygon points="${hexPts(0,0,21)}" fill="#f2e3c0" stroke="#5b3d1f" stroke-width="1.5"/></svg>`;
+  if(k==='dune')return `<svg viewBox="-24 -24 48 48" width="56" height="56"><polygon points="${hexPts(0,0,21)}" fill="#f2e3c0" stroke="#5b3d1f" stroke-width="1.5"/>${[-8,-3,2,7].map(x=>`<circle cx="${x}" cy="-17" r="2.4" fill="#3b2414"/>`).join('')}<text y="-6" text-anchor="middle" font-size="6" font-family="Cinzel">TOP</text></svg>`;
+  if(k==='cliff')return `<svg viewBox="-24 -24 48 48" width="56" height="56"><polygon points="${hexPts(0,0,21)}" fill="#f2e3c0" stroke="#5b3d1f" stroke-width="1.5"/>${[-7,0,7].map(x=>`<path d="M${x-3} -15L${x} -20L${x+3} -15Z" fill="#3b2414"/>`).join('')}<text y="-6" text-anchor="middle" font-size="6" font-family="Cinzel">TOP</text></svg>`;
+  const keep=BROT;BROT=0;const terr={tree:'Woods',bramble:'Brush',bog:'Marsh',sand:'Desert',drift:'Tundra',hill:'Hills',volcano:'Mountains',wall:'Tower'}[k];
+  const hex=BATTLELANDS[terr][k][0];const save=hexXY;let art='';
+  art=hazardArt(terr,hex,0,0);BROT=keep;
+  return `<svg viewBox="-48 -48 96 96" width="56" height="56"><polygon points="${hexPts(0,0,44)}" fill="#f2e3c0" stroke="#5b3d1f" stroke-width="3"/>${art}</svg>`;
+}
+function hazardsHTML(){
+  return `<div class="hzgrid">${HAZARDS.map(h=>`<div class="hz">${hazardIcon(h.k)}<div>
+    <div class="cinzel" style="font-weight:900;color:var(--blood);font-size:15px">${h.name.toUpperCase()}${h.later?' <span class="muted" style="font-size:11px;font-family:EB Garamond;font-weight:400">(not yet on the digital battlelands)</span>':''}</div>
+    ${h.nat?`<div><b>Natives:</b> ${NATIVE[h.nat].join(', ')}</div>`:''}
+    <div><b>Movement:</b> ${h.mv}</div><div><b>Striking:</b> ${h.st}</div><div><b>Rangestriking:</b> ${h.rs}</div></div></div>`).join('')}</div>
+    <p class="muted" style="font-size:13px">Slowed: the hex counts as two hexes of movement. Fliers ignore slowing until they land. A creature in contact with an enemy can't move and can't rangestrike, and must strike one adjacent enemy.</p>`;
+}
+const CHART_TABS=[['muster','Muster chart'],['strike','Strike & rangestrike'],['hazards','Hazards & natives'],['chars','Character chart']];
+function chartsModal(tab){
+  tab=tab||chartsModal.last||'muster';chartsModal.last=tab;
+  const body={muster:musterSVG,strike:()=>`<div class="row" style="align-items:flex-start;gap:22px"><div><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">Strike chart</h3>${strikeTableHTML()}</div><div style="flex:1;min-width:260px"><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">Rangestrike chart</h3>${rangeHTML()}</div></div>`,hazards:hazardsHTML,chars:characterHTML}[tab]();
+  modal(`<div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="row" style="gap:4px">${CHART_TABS.map(([k,l])=>`<button class="${k===tab?'':'alt'}" data-ctab="${k}">${l}</button>`).join('')}</div><button class="alt" id="chX">Close ✕</button></div>
+    <div style="max-height:76vh;overflow:auto">${body}</div>`,(r,close)=>{
+      r.querySelector('.modal').classList.add('wide');
+      r.querySelector('#chX').onclick=close;
+      r.querySelectorAll('[data-ctab]').forEach(b=>b.onclick=()=>chartsModal(b.dataset.ctab));
+    });
+}
+
+$('#btnCharts').onclick=()=>chartsModal();
 /* ================= MODALS ================= */
 function modal(html,setup){
   const root=$('#modalRoot');root.innerHTML=`<div class="modalBg"><div class="modal parch">${html}</div></div>`;
@@ -993,8 +1153,10 @@ function actorOrCur(){return actor(S)??S.cur}
 function canSee(L){return S.status==='over'||(local?L.owner===actorOrCur():mySeats().includes(L.owner))}
 
 /* ---------- battle view ---------- */
-const BR=46,BX0=150,BY0=345;
-const hexXY=h=>[BX0+HEXBY[h].x*BR,BY0+HEXBY[h].y*BR];
+const BR=45,BCX=320,BCY=372;
+let BROT=0;   // set per render from the battle's rotation
+function hexXY(h){const H=HEXBY[h],x=(H.x-3.75)*BR,y=H.y*BR,a=BROT*DEG;
+  return [BCX+x*Math.cos(a)+y*Math.sin(a),BCY-x*Math.sin(a)+y*Math.cos(a)]}
 function hazardArt(T,h,x,y){
   const z=hazardAt(T,h);if(!z)return '';
   const poly=(r,f,st='none',sw=0,extra='')=>`<polygon points="${hexPts(x,y,r)}" fill="${f}" stroke="${st}" stroke-width="${sw}" ${extra} pointer-events="none"/>`;
@@ -1013,31 +1175,36 @@ function hazardArt(T,h,x,y){
   }
   return '';
 }
-function hexPts(x,y,r){return Array.from({length:6},(_,i)=>{const a=i*60*DEG;return (x+r*Math.cos(a)).toFixed(1)+','+(y+r*Math.sin(a)).toFixed(1)}).join(' ')}
+function hexPts(x,y,r){return Array.from({length:6},(_,i)=>{const a=(i*60-BROT)*DEG;return (x+r*Math.cos(a)).toFixed(1)+','+(y+r*Math.sin(a)).toFixed(1)}).join(' ')}
 function battleSVG(){
   const E=S.eng,B=E.battle,t=TER[B.terrain],A=myTurn();
   const u=sel.unit&&B.units.find(x=>x.id===sel.unit);
   const moves=u&&A?battleMoves(S,u):[],targets=u&&A?strikeTargets(S,u):[];
   const att=S.legions[E.att],def=S.legions[E.def];
-  const BL=BATTLELANDS[B.terrain]||{};
+  const BL=BATTLELANDS[B.terrain]||{};BROT=B.rot||0;
+  const sideLabel=(side,who,col)=>{const sd=BSIDES[side==='A'?B.entryA:OPPOSITE[B.entryA]],pts=sd.hex.map(hexXY);
+    const mx=pts.reduce((a,p)=>a+p[0],0)/pts.length,my=pts.reduce((a,p)=>a+p[1],0)/pts.length,ang=(sd.n+BROT)*DEG;
+    const lx=mx+Math.cos(ang)*72,ly=my-Math.sin(ang)*72;
+    return `<g pointer-events="none"><rect x="${lx-64}" y="${ly-11}" width="128" height="22" rx="4" fill="#1a120c" opacity=".88" stroke="${col}" stroke-width="2.5"/><rect x="${lx-58}" y="${ly-5}" width="10" height="10" rx="2" fill="${col}" stroke="#f6e7c3" stroke-width=".8"/><text x="${lx+6}" y="${ly+4}" text-anchor="middle" font-family="Cinzel" font-weight="700" font-size="11" fill="#f6e7c3">${who} enters ${side==='A'?'▸':'▸'}</text></g>`};
   let s=`<svg viewBox="0 0 640 700" xmlns="http://www.w3.org/2000/svg">${SVG_DEFS}
     <rect width="640" height="700" fill="url(#t-${B.terrain})"/><rect width="640" height="700" fill="#fff" filter="url(#stone)" style="mix-blend-mode:multiply"/>
     <rect width="640" height="700" fill="url(#vign)"/>
-    <g filter="url(#paint)"><path d="M42,92 L590,86 L604,610 L48,622 Z" fill="#e8cf9c"/></g>
-    <path d="M42,92 L590,86 L604,610 L48,622 Z" filter="url(#parch)" style="mix-blend-mode:multiply" pointer-events="none"/>
+    <g filter="url(#paint)"><path d="M36,86 L600,80 L612,640 L40,652 Z" fill="#e8cf9c"/></g>
+    <path d="M36,86 L600,80 L612,640 L40,652 Z" filter="url(#parch)" style="mix-blend-mode:multiply" pointer-events="none"/>
     <path d="M42,92 q30,-8 60,4 q-40,6 -56,40 z" fill="#c9a96c" opacity=".8"/>
     <text x="600" y="58" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="30" fill="#f6e7c3" stroke="#2a1608" stroke-width="1">${B.terrain}</text>
     <use href="#g-${t.g}" x="570" y="62" width="26" height="26"/>
     <text x="28" y="40" font-family="Cinzel" font-weight="900" font-size="16" fill="#f6e7c3" stroke="#2a1608" stroke-width=".6">Battle turn ${Math.min(B.turn,7)} of 7</text>
-    <text x="60" y="118" font-family="Cinzel" font-weight="700" font-size="12" fill="${COLORS[S.seats[def.owner].color].c}" stroke="#000" stroke-width=".3">◀ Defender: ${esc(pname(def.owner))}</text>
-    <text x="586" y="118" text-anchor="end" font-family="Cinzel" font-weight="700" font-size="12" fill="${COLORS[S.seats[att.owner].color].c}" stroke="#000" stroke-width=".3">Attacker: ${esc(pname(att.owner))} ▶</text>`;
-  for(const h of HEX){const [x,y]=hexXY(h.id);const entry=h.c===0||h.c===BCOLS.length-1;
+    <text x="28" y="66" font-family="Cinzel" font-weight="700" font-size="12" fill="#f6e7c3" stroke="#2a1608" stroke-width=".4">Attacker: ${esc(pname(att.owner))} · Defender: ${esc(pname(def.owner))}</text>`;
+  const eA=entryHexes(B,'A'),eD=B.terrain==='Tower'?[]:entryHexes(B,'D');
+  for(const h of HEX){const [x,y]=hexXY(h.id);const entry=eA.includes(h.id)||eD.includes(h.id);
     const shade=['Hills','Mountains','Tower'].includes(B.terrain)&&!hazardAt(B.terrain,h.id)?'rgba(90,60,40,.32)':'rgba(255,250,235,.06)';
     s+=`<polygon data-hex="${h.id}" points="${hexPts(x,y,BR-1)}" fill="${shade}" stroke="#5b3d1f" stroke-width="2" style="cursor:pointer"/>`;
     s+=hazardArt(B.terrain,h.id,x,y);
-    if(entry)s+=`<polygon points="${hexPts(x,y,BR-7)}" fill="none" stroke="${h.c===0?COLORS[S.seats[def.owner].color].c:COLORS[S.seats[att.owner].color].c}" stroke-width="2" stroke-dasharray="4 4" opacity=".6" pointer-events="none"/>`;}
+    if(entry)s+=`<polygon points="${hexPts(x,y,BR-7)}" fill="none" stroke="${eA.includes(h.id)?COLORS[S.seats[att.owner].color].c:COLORS[S.seats[def.owner].color].c}" stroke-width="2" stroke-dasharray="4 4" opacity=".6" pointer-events="none"/>`;}
+  if(B.turn===1||B.units.some(u=>!u.dead&&!u.hex)){s+=sideLabel('A','Attacker',COLORS[S.seats[att.owner].color].c);if(B.terrain!=='Tower')s+=sideLabel('D','Defender',COLORS[S.seats[def.owner].color].c)}
   const kinds=Object.keys(BL).map(k=>k==='hill'?'slope':k).filter(k=>NATIVE[k]);
-  if(kinds.length)s+=`<g transform="translate(40,636)"><rect width="560" height="${18+kinds.length*16}" rx="4" fill="#1a120c" stroke="#c9a24a"/>${kinds.map((k,i)=>`<text x="10" y="${15+i*16}" font-family="Cinzel" font-weight="700" font-size="11" fill="#e9c66a">${{slope:'Slope',bog:'Bog',bramble:'Bramble',sand:'Sand',drift:'Drift',volcano:'Volcano'}[k]} natives:</text><text x="130" y="${15+i*16}" font-family="EB Garamond" font-size="12" fill="#f3e2b8">${NATIVE[k].join(', ')}</text>`).join('')}</g>`;
+  if(kinds.length)s+=`<g transform="translate(40,${700-24-kinds.length*16})"><rect width="560" height="${18+kinds.length*16}" rx="4" fill="#1a120c" stroke="#c9a24a"/>${kinds.map((k,i)=>`<text x="10" y="${15+i*16}" font-family="Cinzel" font-weight="700" font-size="11" fill="#e9c66a">${{slope:'Slope',bog:'Bog',bramble:'Bramble',sand:'Sand',drift:'Drift',volcano:'Volcano'}[k]} natives:</text><text x="130" y="${15+i*16}" font-family="EB Garamond" font-size="12" fill="#f3e2b8">${NATIVE[k].join(', ')}</text>`).join('')}</g>`;
   for(const h of moves){const [x,y]=hexXY(h);s+=`<polygon class="hl" points="${hexPts(x,y,BR-5)}" fill="rgba(255,226,122,.3)" stroke="#ffe27a" stroke-width="3" pointer-events="none"/>`}
   for(const u2 of B.units){if(u2.dead||!u2.hex)continue;const [x,y]=hexXY(u2.hex);
     const col=COLORS[S.seats[u2.owner].color].c,pw=unitPower(S,u2),isT=targets.find(q=>q.t===u2.id),isS=sel.unit===u2.id;
@@ -1062,8 +1229,8 @@ function trayHTML(){
   const B=S.eng.battle,off=B.units.filter(u=>!u.dead&&!u.hex);if(!off.length)return '';
   const part=side=>off.filter(u=>u.side===side).map(u=>chitHTML(u.c,{cls:'pick'+(sel.unit===u.id?' sel':''),attrs:`data-tray="${u.id}"`,power:unitPower(S,u),border:COLORS[S.seats[u.owner].color].c,owner:u.owner})).join('');
   return `<div class="row" style="width:100%;max-width:640px;justify-content:space-between;margin-top:6px">
-    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Attacker waiting to enter (right edge)</div><div class="tray">${part('A')||'<span class="muted">—</span>'}</div></div>
-    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Defender waiting to enter (left edge)</div><div class="tray">${part('D')||'<span class="muted">—</span>'}</div></div></div>`;
+    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Attacker waiting to enter (marked side)</div><div class="tray">${part('A')||'<span class="muted">—</span>'}</div></div>
+    <div class="parch card" style="padding:6px 8px"><div class="cinzel" style="font-size:12px">Defender waiting to enter (opposite side)</div><div class="tray">${part('D')||'<span class="muted">—</span>'}</div></div></div>`;
 }
 
 /* ---------- side panel ---------- */
@@ -1100,9 +1267,10 @@ function sideHTML(){
       const en=engagements(S);
       h+=`<p>Choose an engagement to resolve:</p><div class="row">${en.map(l=>`<button data-eng="${l}">${LANDS[l].terrain} ${LANDS[l].label}</button>`).join('')}</div>`;
     }else if(S.phase==='muster'){
-      const el=legionsOf(S,S.cur).filter(L=>canMuster(S,L));
+      const el=legionsOf(S,S.cur).filter(L=>canMuster(S,L)),no=legionsOf(S,S.cur).filter(L=>!canMuster(S,L)&&L.moved);
       h+=`<p>${el.length?'Muster one creature in each eligible legion that moved:':'No legion can muster this turn.'}</p>
         <div class="row">${el.map(L=>`<button class="alt" data-mus="${L.id}">${L.id} · ${LANDS[L.land].terrain}</button>`).join('')}</div>
+        ${no.length?`<div class="muted" style="font-size:13.5px;margin-top:6px">${no.map(L=>`${L.id} (${LANDS[L.land].terrain}): ${musterBlock(S,L)}`).join('<br>')}</div>`:''}
         <div class="row" style="margin-top:8px"><button id="bEndTurn">End turn</button></div>`;
     }
     h+='</div>';
@@ -1136,7 +1304,7 @@ function destMusterHTML(lid){
     ${rows.map(r=>`<div class="dest" data-dest="${r.id}" style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;cursor:pointer;${hoverLand===r.id?'background:rgba(255,226,122,.45);outline:1px solid #c9a24a':''}">
       <span class="sw" style="background:${TER[r.T].c};border-color:#2a1a10"></span>
       <span style="min-width:96px"><b>${r.T}</b> ${LANDS[r.id].label}${r.tele?' <i>(teleport)</i>':''}${r.enemy?' <b style="color:#8e2a1e">⚔ battle</b>':''}</span>
-      <span style="display:flex;gap:3px;flex-wrap:wrap">${r.opts.length?r.opts.map(c=>`<span class="mini" title="${c} ${CRE[c][0]}-${CRE[c][1]}" style="font-family:Cinzel;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px;background:#f3e6c4;border:1px solid #b59a68;color:${CRE_COL[c]}">${c}</span>`).join(''):`<span class="muted" style="font-size:13px">${L.cre.length>=MAX_LEGION?'legion full':'nothing'}</span>`}</span></div>`).join('')}
+      <span style="display:flex;gap:3px;flex-wrap:wrap">${r.T==='Tower'&&!r.opts.includes('Warlock')&&!L.cre.includes('Titan')?'<span class="muted" style="font-size:12px" title="Warlock needs your Titan in the legion">(no Titan: no Warlock)</span>':''}${r.opts.length?r.opts.map(c=>`<span class="mini" title="${c} ${CRE[c][0]}-${CRE[c][1]}" style="font-family:Cinzel;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px;background:#f3e6c4;border:1px solid #b59a68;color:${CRE_COL[c]}">${c}</span>`).join(''):`<span class="muted" style="font-size:13px">${L.cre.length>=MAX_LEGION?'legion full':'nothing'}</span>`}</span></div>`).join('')}
     <div class="muted" style="font-size:12.5px;margin-top:4px">Click a row or a glowing land to move there.</div>`;
 }
 function legionButtons(L){
@@ -1213,12 +1381,14 @@ function wire(){
   document.querySelectorAll('[data-merge]').forEach(b=>b.onclick=()=>act(S2=>doMerge(S2,sel.legion,b.dataset.merge)));
   document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>act(S2=>undoMove(S2,b.dataset.undo)));
   document.querySelectorAll('[data-mus]').forEach(b=>b.onclick=()=>{const L=S.legions[b.dataset.mus];
-    pickModal(`Muster for ${L.id} in the ${LANDS[L.land].terrain}`,recruitOptions(S,L).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doRecruit(S2,L.id,it.c)))});
+    const hints=towerHints(S,L);
+    pickModal(`Muster for ${L.id} in the ${LANDS[L.land].terrain}`,recruitOptions(S,L).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doRecruit(S2,L.id,it.c)),
+      hints.length?'Not available here: '+hints.map(h=>`<b>${h.c}</b> ${h.why}`).join('; ')+'.':'')});
   on('bEndMan',()=>{sel={};act(endManeuver)});on('bResetMan',()=>act(resetManeuver));
   on('bEndStr',()=>{sel={};act(endStrikes)});on('bAutoStr',()=>act(S2=>{autoStrikes(S2)}));
   on('bConcede',()=>confirmBox('Concede this battle? Your legion will be destroyed and your opponent scores its full value.',()=>{const B=S.eng.battle;const side=B.phase==='sb'?other(B.side):B.side;sel={};act(S2=>concede(S2,side))}));
-  on('bSummon',()=>pickModal('Summon an angel',summonOptions(S).map(o=>({...o,sub:'from '+o.lid})),o=>act(S2=>doSummon(S2,o.lid,o.c)),'It joins the attacking legion permanently and must enter from the right edge this maneuver.'));
-  on('bReinf',()=>pickModal('Reinforce the defender',reinforceOptions(S).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doReinforce(S2,it.c)),'It enters from the left edge this maneuver.'));
+  on('bSummon',()=>pickModal('Summon an angel',summonOptions(S).map(o=>({...o,sub:'from '+o.lid})),o=>act(S2=>doSummon(S2,o.lid,o.c)),'It joins the attacking legion permanently and must enter from the attacker\'s side this maneuver.'));
+  on('bReinf',()=>pickModal('Reinforce the defender',reinforceOptions(S).map(c=>({c,sub:`${S.care[c]} left`})),it=>act(S2=>doReinforce(S2,it.c)),'It enters from the defender\'s side this maneuver.'));
 }
 function clickLegion(id){
   const L=S.legions[id];
@@ -1228,8 +1398,23 @@ function clickLegion(id){
   if(sel.legion&&myTurn()&&S.phase==='split'&&L.owner===S.cur&&L.cre.length===8)splitModal(id);
   render();
 }
+// 10.1 / 10.4: let the attacker pick which border it attacks through when there is a choice
+function entryModal(id,land,t){
+  const nb=d=>{const L=LANDS[land];let best=null,bd=99;LAND_IDS.forEach(o=>{if(o===land)return;const O=LANDS[o];const dist=Math.hypot(O.x-L.x,O.y-L.y);
+    if(dist<70&&dirToward(land,o)===d&&dist<bd){bd=dist;best=o}});return best};
+  modal(`<h2>Attack the ${LANDS[land].terrain} ${LANDS[land].label} from which side?</h2>
+    <p class="muted">${t.tele?'Titan teleport (rule 10.4): you may enter the battleland from any of its wide sides.':'Your legion can reach this land through more than one border. Your creatures enter the battleland on the matching wide side; the defender enters on the opposite side.'}</p>
+    <div class="row">${t.dirs.map(d=>{const o=nb(d);return `<button data-dir="${d}">${DIR_NAME[d]}${o?` (from ${LANDS[o].terrain} ${LANDS[o].label})`:''}</button>`}).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="alt" id="enX">Cancel</button></div>`,(r,close)=>{
+      r.querySelector('#enX').onclick=close;
+      r.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{close();sel={};act(S2=>doMove(S2,id,land,+b.dataset.dir))});
+    });
+}
 function clickLand(land){
-  if(S.phase==='move'&&myTurn()&&sel.legion&&moveTargets(S,sel.legion)[land]){const id=sel.legion;sel={};act(S2=>doMove(S2,id,land));return}
+  if(S.phase==='move'&&myTurn()&&sel.legion&&moveTargets(S,sel.legion)[land]){
+    const id=sel.legion,t=moveTargets(S,id)[land],L=S.legions[id],enemy=legionsAt(S,land).some(x=>x.owner!==L.owner);
+    if(enemy&&t.dirs.length>1){entryModal(id,land,t);return}
+    sel={};act(S2=>doMove(S2,id,land));return}
   const here=legionsAt(S,land);
   if(here.length){const i=here.findIndex(x=>x.id===sel.legion);sel.legion=here[(i+1)%here.length].id;render()}
   else if(sel.legion){sel={};render()}
@@ -1253,7 +1438,7 @@ function rulesHTML(){
   <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits</b> (board legend): starting a move, a legion may leave through a circle (●), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Continuing, it must follow triple arrows where its land has them, otherwise a single arrow, and may never backtrack. A legion must use its full roll, except that its move ends as soon as it enters a land held by an enemy legion (an engagement). It may pass through, but not stop on, a land held by another of your legions → resolve engagements → muster one creature in each legion that moved.</p>
   <p><b>Teleport.</b> On a 6, a legion with a Lord in a Tower may teleport to any empty Tower. With 400+ points, your Titan's legion may teleport onto any enemy legion. One teleport per turn.</p>
   <p><b>Mustering.</b> Each terrain has a recruit tree. You may muster a creature if the legion already has one of it, has enough of the next-lower creature (number shown), or has a higher creature in that tree. Towers muster Centaur, Gargoyle or Ogre freely; a Guardian with three of one kind; a Warlock with your Titan.</p>
-  <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender (entering on the narrow left side) moves first, the attacker enters on the wide right side. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
+  <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender moves first. The attacker enters on the wide side matching the border it crossed into the land (chosen freely after a Titan teleport); the defender enters on the narrow side opposite. In the Tower the attacker always enters on the lower left. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
   <p><b>Scoring.</b> Win a battle to score the loser's full value (power × skill of each creature). Every 100 points earns an Angel, and every 500 an Archangel. Your Titan's power is 6 + 1 per 100 points. If your Titan dies, you're out.</p>
   <table style="font-size:13px;border-collapse:collapse;width:100%">${Object.entries(TREES).map(([t,tr])=>`<tr><td style="padding:2px 6px 2px 0"><b>${t}</b></td><td>${tr.map(([c,n],i)=>(i?` →${n?n+'× ':''} `:'')+c).join('')}</td></tr>`).join('')}</table>
   </div></details>`;
