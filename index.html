@@ -316,7 +316,8 @@ function moveTargets(S,lid){
     else{const tri=ex.filter(e=>e[1]===4);ex=tri.length?tri:ex.filter(e=>e[1]===3)}
     for(const [n] of ex){
       if(seen.has(n))continue;
-      if(enemy(n)){if(steps===1&&!own(n))out[n]={tele:false};continue}
+      // 6.2 / 7.1: a move ends early on entering a land held by another player's legion (an engagement)
+      if(enemy(n)){if(!own(n))out[n]={tele:false};continue}
       seen.add(n);dfs(n,steps-1,false,seen);seen.delete(n);
     }
   })(L.land,S.roll,true,new Set([L.land]));
@@ -1123,7 +1124,10 @@ function sideHTML(){
 let hoverLand=null;
 function destMusterHTML(lid){
   const L=S.legions[lid],tg=moveTargets(S,lid),ids=Object.keys(tg);
-  if(!ids.length)return '<p class="muted">No legal moves for this legion.</p>';
+  if(!ids.length){
+    const saved=S.legions;S.legions=Object.fromEntries(Object.entries(saved).filter(([k,v])=>v.owner!==L.owner||k===lid));
+    const freeIfOwnMoved=Object.keys(moveTargets(S,lid)).length;S.legions=saved;
+    return `<p class="muted">${freeIfOwnMoved?'No legal moves right now: every land this legion could reach with a '+S.roll+' is held by another of your legions. Move that legion first, then come back to this one.':'No legal moves for this legion with a '+S.roll+'.'}</p>`}
   const rows=ids.map(id=>{const T=LANDS[id].terrain,enemy=legionsAt(S,id).some(x=>x.owner!==L.owner);
       const opts=recruitOptions(S,{cre:L.cre,land:id,owner:L.owner},T).sort((a,b)=>valueOf(S,L.owner,b)-valueOf(S,L.owner,a));
       return {id,T,enemy,tele:tg[id].tele,opts,best:opts.length?valueOf(S,L.owner,opts[0]):-1}})
@@ -1246,7 +1250,7 @@ function clickHex(h){
 function rulesHTML(){
   return `<details><summary>Rules at a glance</summary><div style="font-size:14.5px;line-height:1.4">
   <p><b>Goal.</b> Be the last player with a living Titan.</p>
-  <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits</b> (board legend): starting a move, a legion may leave through a circle (●), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Continuing, it must follow triple arrows where its land has them, otherwise a single arrow, and may never backtrack. A legion stops when it enters a land with an enemy → resolve engagements → muster one creature in each legion that moved.</p>
+  <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits</b> (board legend): starting a move, a legion may leave through a circle (●), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Continuing, it must follow triple arrows where its land has them, otherwise a single arrow, and may never backtrack. A legion must use its full roll, except that its move ends as soon as it enters a land held by an enemy legion (an engagement). It may pass through, but not stop on, a land held by another of your legions → resolve engagements → muster one creature in each legion that moved.</p>
   <p><b>Teleport.</b> On a 6, a legion with a Lord in a Tower may teleport to any empty Tower. With 400+ points, your Titan's legion may teleport onto any enemy legion. One teleport per turn.</p>
   <p><b>Mustering.</b> Each terrain has a recruit tree. You may muster a creature if the legion already has one of it, has enough of the next-lower creature (number shown), or has a higher creature in that tree. Towers muster Centaur, Gargoyle or Ogre freely; a Guardian with three of one kind; a Warlock with your Titan.</p>
   <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender (entering on the narrow left side) moves first, the attacker enters on the wide right side. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
