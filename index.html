@@ -48,8 +48,15 @@ header .sub{font-style:italic;opacity:.8}
 header .sp{flex:1}
 main{flex:1;display:flex;gap:14px;padding:0 14px 14px;align-items:flex-start}
 #boardWrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center}
-#boardWrap svg{width:100%;max-width:min(92vh,980px);height:auto;display:block;user-select:none}
-#side{width:360px;flex:0 0 360px;display:flex;flex-direction:column;gap:12px}
+#boardWrap svg{width:100%;max-width:min(94vh,1180px);height:auto;display:block;user-select:none}
+#zoomBox{position:relative;width:100%;max-width:min(94vh,1180px)}
+#zoomBox svg{max-width:none!important;touch-action:none}
+.zctl{position:absolute;top:8px;right:8px;display:flex;gap:4px;align-items:center;z-index:5;background:rgba(26,18,12,.55);padding:4px;border-radius:6px}
+.zctl button{width:32px;height:32px;padding:0;font-size:18px;line-height:1}
+.zpct{color:#f6e7c3;font-family:Cinzel;font-size:12px;min-width:40px;text-align:center}
+.ztip{font-size:12.5px;color:#e9d8b4;opacity:.8;margin-top:4px;text-align:center}
+
+#side{width:330px;flex:0 0 330px;display:flex;flex-direction:column;gap:12px}
 .card{padding:12px 14px}
 .card h3{margin:0 0 8px;font-size:15px;color:var(--bronze);border-bottom:1px solid rgba(140,90,43,.35);padding-bottom:4px}
 .players .p{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:4px}
@@ -936,6 +943,46 @@ function renderLobby(){
   const r=$('#btnResume');if(r)r.onclick=()=>{saveName();hostGame(0,saved)};
   $('#btnJoin').onclick=()=>{saveName();const c=$('#roomCode').value.trim();if(!myName())return toast('Enter your name first.');if(c.length<5)return toast('Enter the 5-letter room code.');joinRoom(c)};
 }
+/* ================= BOARD ZOOM & PAN ================= */
+// The view (part of the board shown) is kept between renders, separately for the masterboard and each battle.
+const ZOOM={views:{},max:5};
+function setupZoom(){
+  const wrap=document.getElementById('zoomBox');if(!wrap)return;
+  const svg=wrap.querySelector('svg');if(!svg)return;
+  const inBattle=S.eng&&S.eng.stage==='battle',key=inBattle?'battle:'+S.eng.land+':'+S.eng.att:'master';
+  const vb=svg.viewBox.baseVal,base={x:vb.x,y:vb.y,w:vb.width,h:vb.height};
+  if(!ZOOM.views[key])ZOOM.views[key]={...base};
+  if(inBattle)Object.keys(ZOOM.views).forEach(k=>{if(k.startsWith('battle:')&&k!==key)delete ZOOM.views[k]});
+  const v=ZOOM.views[key];
+  const clamp=()=>{v.w=Math.min(base.w,Math.max(base.w/ZOOM.max,v.w));v.h=v.w*base.h/base.w;
+    v.x=Math.min(base.x+base.w-v.w,Math.max(base.x,v.x));v.y=Math.min(base.y+base.h-v.h,Math.max(base.y,v.y))};
+  const apply=()=>{clamp();svg.setAttribute('viewBox',`${v.x} ${v.y} ${v.w} ${v.h}`);
+    const pct=Math.round(base.w/v.w*100),lab=wrap.querySelector('.zpct');if(lab)lab.textContent=pct+'%'};
+  const toSvg=(cx,cy)=>{const r=svg.getBoundingClientRect();return [v.x+(cx-r.left)/r.width*v.w,v.y+(cy-r.top)/r.height*v.h]};
+  const zoomAt=(f,cx,cy)=>{const [px,py]=cx==null?[v.x+v.w/2,v.y+v.h/2]:toSvg(cx,cy);const nw=Math.min(base.w,Math.max(base.w/ZOOM.max,v.w/f)),k=nw/v.w;
+    v.x=px-(px-v.x)*k;v.y=py-(py-v.y)*k;v.w=nw;v.h=nw*base.h/base.w;apply()};
+  apply();
+  wrap.querySelector('.zin').onclick=()=>zoomAt(1.4);
+  wrap.querySelector('.zout').onclick=()=>zoomAt(1/1.4);
+  wrap.querySelector('.zreset').onclick=()=>{Object.assign(v,base);apply()};
+  svg.addEventListener('wheel',e=>{e.preventDefault();zoomAt(Math.pow(1.0015,-e.deltaY),e.clientX,e.clientY)},{passive:false});
+  // drag to pan, pinch to zoom; a drag never counts as a click
+  const pts=new Map();let moved=false,start=null,pinch=null;
+  svg.addEventListener('pointerdown',e=>{pts.set(e.pointerId,[e.clientX,e.clientY]);moved=false;start={x:e.clientX,y:e.clientY,vx:v.x,vy:v.y};
+    if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]),w:v.w}}});
+  svg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===2&&pinch){const [a,b]=[...pts.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);moved=true;zoomAt(v.w/(pinch.w*pinch.d/d),(a[0]+b[0])/2,(a[1]+b[1])/2);return}
+    if(pts.size!==1||!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;
+    if(!moved&&Math.hypot(dx,dy)<6)return;
+    if(!moved){moved=true;try{svg.setPointerCapture(e.pointerId)}catch(_){}}
+    if(v.w>=base.w)return;
+    const r=svg.getBoundingClientRect();v.x=start.vx-dx/r.width*v.w;v.y=start.vy-dy/r.height*v.h;apply();svg.style.cursor='grabbing'});
+  const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(!pts.size){start=null;svg.style.cursor=''}};
+  svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
+  svg.addEventListener('click',e=>{if(moved){e.stopPropagation();e.preventDefault();moved=false}},true);
+}
+function zoomControls(){return `<div class="zctl"><button class="alt zin" title="Zoom in">+</button><button class="alt zout" title="Zoom out">−</button><button class="alt zreset" title="Show the whole board">⤢</button><span class="zpct">100%</span></div>`}
+
 /* ================= REFERENCE CHARTS ================= */
 const MUSTER_POS={Colossus:[350,46],Giant:[140,170],Hydra:[262,186],Dragon:[392,186],Serpent:[586,52],
   Wyvern:[64,292],Unicorn:[262,292],Griffon:[456,306],Behemoth:[586,196],
@@ -1083,8 +1130,8 @@ function render(){
   if(S.status==='lobby'){renderWaiting();return}
   const inBattle=S.eng&&S.eng.stage==='battle';
   $('#hdrInfo').textContent=`Turn ${S.turn}`+(local?' · hotseat':'');
-  $('#main').innerHTML=`<div id="boardWrap">${inBattle?battleSVG():boardSVG()}${inBattle?trayHTML():''}</div><div id="side">${sideHTML()}</div>`;
-  wire();
+  $('#main').innerHTML=`<div id="boardWrap"><div id="zoomBox" style="max-width:min(calc((100vh - 120px) * ${inBattle?640/700:1040/980}),1180px)">${inBattle?battleSVG():boardSVG()}${zoomControls()}</div><div class="ztip">Scroll or pinch to zoom · drag to move around</div>${inBattle?trayHTML():''}</div><div id="side">${sideHTML()}</div>`;
+  wire();setupZoom();
   if(S.eng&&S.eng.stage==='decide'&&myTurn()&&!$('#modalRoot').innerHTML)decideModal();
 }
 function renderWaiting(){
@@ -1327,7 +1374,7 @@ function battlePanel(){
     <div class="row" style="gap:3px;margin-top:3px">${lr.rolls.map(r=>`<span class="die sm ${r>=lr.tn?'hit':''}">${r}</span>`).join('')}</div></div>`;
   if(!mine)return h+'<p class="muted">Waiting for their move…</p>';
   if(B.phase==='man'){
-    h+=`<p>Click a creature (or one waiting to enter below the board), then a glowing hex. Creatures must stop when they move next to an enemy. Any creature not on the board when you finish is lost.</p>
+    h+=`<p>Click a creature (or one waiting to enter below the board), then a glowing hex. Creatures already next to an enemy can't move; others may move past enemies. Any creature not on the board when you finish is lost.</p>
       <div class="row"><button id="bEndMan">Done maneuvering</button><button class="alt" id="bResetMan">Reset moves</button>
       ${summonOptions(S).length?'<button class="alt" id="bSummon">Summon angel (now or never)</button>':''}
       ${reinforceOptions(S).length?'<button class="alt" id="bReinf">Reinforce</button>':''}</div>`;
