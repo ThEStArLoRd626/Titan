@@ -580,7 +580,7 @@ function doStrike(S,uid,tid){
   const dice=strikeDice(S,B.terrain,u,t,opt.range),tn=strikeNumber(B.terrain,u,t,opt.range);
   const rolls=Array.from({length:dice},()=>rnd(6)),hits=rolls.filter(r=>r>=tn).length;
   const need=unitPower(S,t)-t.hits;t.hits+=hits;u.struck=true;
-  const kill=t.hits>=unitPower(S,t);if(kill)t.dying=true;
+  const kill=t.hits>=unitPower(S,t);if(kill){t.dying=true;t.how=B.phase==='sb'?'a strikeback':opt.range?'a rangestrike':'a strike'}
   S.lastRoll={who:u.c,tgt:t.c,rolls,tn,hits,range:opt.range,kill};
   log(S,`${u.c} ${opt.range?'rangestrikes':'strikes'} ${t.c}: ${dice} dice needing ${tn}+ → ${hits} hit${hits===1?'':'s'}${kill?' — slain!':''}`);
   let extra=kill&&!opt.range?hits-need:0;
@@ -589,7 +589,7 @@ function doStrike(S,uid,tid){
       .sort((x,y)=>(unitPower(S,x)-x.hits)-(unitPower(S,y)-y.hits))[0];
     if(!c2)break;
     const left=unitPower(S,c2)-c2.hits,take=Math.min(extra,left);c2.hits+=take;extra-=take;
-    const k2=c2.hits>=unitPower(S,c2);if(k2)c2.dying=true;
+    const k2=c2.hits>=unitPower(S,c2);if(k2){c2.dying=true;c2.how='carried-over hits'}
     log(S,`  ${take} hit${take===1?'':'s'} carr${take===1?'ies':'y'} over to ${c2.c}${k2?' — slain!':''}`);
     S.lastRoll.carry=(S.lastRoll.carry||'')+` +${take} to ${c2.c}${k2?' (slain)':''}`;
   }
@@ -613,7 +613,7 @@ function endManeuver(S){
   if(checkBattleEnd(S))return;
   B.phase='str';B.units.forEach(u=>u.struck=false);
   B.units.forEach(u=>{if(!u.dead&&u.hex&&hazardAt(B.terrain,u.hex)==='drift'&&!isNative(u.c,'drift')){
-    u.hits++;log(S,`${u.c} suffers a hit from the drift.`);if(u.hits>=unitPower(S,u))u.dying=true}});
+    u.hits++;log(S,`${u.c} suffers a hit from the drift.`);if(u.hits>=unitPower(S,u)){u.dying=true;u.how='the drift'}}});
   if(!anyStrike(S))endStrikes(S);
 }
 function endStrikes(S){
@@ -625,7 +625,10 @@ function endStrikes(S){
     return;
   }
   // end of strikeback: remove the slain
+  const opened=!B.summonWin&&!B.summonDone;
   B.units.forEach(u=>{if(u.dying&&!u.dead){u.dead=true;u.dying=false;if(u.side==='D'&&!B.summonDone)B.summonWin=true;log(S,`${u.c} (${u.side==='A'?'attacker':'defender'}) is removed.`)}});
+  if(opened&&B.summonWin){const v=B.units.filter(u=>u.side==='D'&&u.dead&&u.how).map(u=>`${u.c} (${u.how})`).join(', ');
+    log(S,`Defender's ${v||'creature'} slain — the attacker may summon an Angel in its next maneuver only (rule 15).`)}
   if(checkBattleEnd(S))return;
   B.units.forEach(u=>{u.moved=false;u.struck=false});
   if(B.side==='D'){B.side='A'}
@@ -1394,7 +1397,8 @@ function sideHTML(){
     <div class="muted" style="font-size:12.5px;margin-top:4px">Crossed-out dice were re-rolled because that Tower was already taken or another player rolled the same number. ★ Highest Tower plays first.</div></div>`:'';
   h+=`<div class="parch card players"><h3>Players</h3>${S.seats.map((s,i)=>`<div class="p ${i===S.cur&&S.status==='play'?'cur':''} ${s.alive?'':'dead'}">
       <span class="sw" style="background:${COLORS[s.color].c}"></span><span>${esc(pname(i))}${mySeats().includes(i)&&!local?' <i>(you)</i>':''}${!local&&isHost&&s.uid!==me&&!isOnline(s.uid)?' <i title="not connected">⚠</i>':''}</span>
-      <span class="muted" style="font-size:13px">${legionsOf(S,i).length} leg.</span><span class="score">${s.score}</span></div>`).join('')}</div>`;
+      <span class="muted" style="font-size:13px;white-space:nowrap" title="Legions on the board · creatures in all of them (counts are public; contents stay hidden)">${legionsOf(S,i).length} leg. · <b style="font-style:normal;color:var(--ink)">${legionsOf(S,i).reduce((a,L)=>a+L.cre.length,0)}</b> units</span><span class="score" title="Score">${s.score}</span></div>`).join('')}
+    <div class="muted" style="font-size:12px;margin-top:4px;text-align:right">legions · units · score</div></div>`;
   h+=`<div class="parch card">`;
   if(S.status==='play'&&S.post){
     const P=S.post,W=S.legions[P.lid],opts=postOptions(S);
