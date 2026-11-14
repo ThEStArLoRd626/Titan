@@ -88,7 +88,7 @@ main{flex:1;display:flex;gap:14px;padding:0 14px 14px;align-items:flex-start}
 .die.hit{background:#8e2a1e;color:#fff}
 .modalBg{position:fixed;inset:0;background:rgba(20,10,4,.6);display:flex;align-items:center;justify-content:center;z-index:20}
 .modal{max-width:560px;width:calc(100% - 30px);padding:18px 20px}
-.modal.wide{max-width:960px}
+.modal.wide{max-width:1180px}
 table.ref{border-collapse:collapse;font-size:14.5px;margin:6px 0}
 table.ref th,table.ref td{border:1px solid rgba(90,70,50,.35);padding:3px 8px;text-align:center}
 table.ref th{background:rgba(185,133,67,.22);font-family:Cinzel;font-size:12px}
@@ -120,6 +120,7 @@ svg .hl{animation:pulse 1.2s ease-in-out infinite}
   <header>
     <h1>TITAN</h1><span class="sub">a fan-made web edition</span><span class="sp"></span>
     <span id="hdrInfo" class="cinzel" style="font-size:13px"></span>
+    <button class="alt" id="btnSaveFile" style="display:none" title="Download this game as a save file">💾 Save file</button>
     <button class="alt" id="btnCharts">📜 Charts</button>
     <button class="alt" id="btnLobby" style="display:none">Lobby</button>
   </header>
@@ -274,22 +275,32 @@ function log(S,msg){S.log.push(msg);if(S.log.length>80)S.log.splice(0,S.log.leng
 function seatName(S,i){return COLORS[S.seats[i].color].n}
 function startGame(S){
   S.seats=S.seats.filter(s=>s.uid!=null);
-  const towers=shuffle(TOWERS.slice()), cols=shuffle([0,1,2,3,4,5]);
+  const cols=shuffle([0,1,2,3,4,5]);
+  // 5.1: each player rolls one die for his Tower (a 2 means Tower 200). Anyone who rolls the same number as
+  // another player this round, or a Tower already taken, rolls again. The highest Tower plays first.
+  const towerOf=n=>TOWERS.find(t=>LANDS[t].label===String(n*100));
+  const got={},hist=S.seats.map(()=>[]);let left=S.seats.map((_,i)=>i),guard=0;
+  while(left.length&&guard++<200){
+    const r={};left.forEach(i=>{r[i]=rnd(6);hist[i].push(r[i])});
+    left=left.filter(i=>{const n=r[i];if(Object.values(got).includes(n)||left.some(j=>j!==i&&r[j]===n))return true;got[i]=n;return false});
+  }
   S.care={};for(const c in CRE)S.care[c]=CRE[c][3];
   S.legions={};
   S.seats.forEach((s,i)=>{
-    s.color=cols[i];s.score=0;s.alive=true;s.tower=towers[i];
+    s.color=cols[i];s.score=0;s.alive=true;s.tower=towerOf(got[i]);s.towerRoll=got[i];s.rolls=hist[i];
     const id=COLORS[s.color].k+'01';
     const cre=['Titan','Angel','Centaur','Centaur','Gargoyle','Gargoyle','Ogre','Ogre'];
     cre.forEach(c=>{if(c!=='Titan')S.care[c]--});
     S.legions[id]={id,owner:i,land:s.tower,cre,moved:false,rec:false};
   });
-  // turn order: random
-  const order=shuffle(S.seats.map((_,i)=>i));
+  // turn order: highest Tower first, then down the Tower numbers
+  const order=S.seats.map((_,i)=>i).sort((a,b)=>got[b]-got[a]);
   S.seats=order.map(i=>S.seats[i]);
   Object.values(S.legions).forEach(L=>{L.owner=order.indexOf(L.owner)});
   Object.assign(S,{status:'play',turn:1,cur:0,phase:'split',roll:null,mull:{},tele:false,eng:null,lastRoll:null,winner:null});
-  log(S,'The game begins. Each player must split their starting legion into two legions of four.');
+  S.setup=true;
+  S.seats.forEach((s,i)=>log(S,`${seatName(S,i)} rolls ${s.rolls.join(', then ')}${s.rolls.length>1?' (re-rolled a taken Tower)':''} and starts in Tower ${s.towerRoll*100}.`));
+  log(S,`${seatName(S,0)} holds the highest Tower and plays first. Each player splits their starting legion into two legions of four, one with the Titan and one with the Angel.`);
 }
 const legionsOf=(S,seat)=>Object.values(S.legions).filter(L=>L.owner===seat);
 const legionsAt=(S,land)=>Object.values(S.legions).filter(L=>L.land===land);
@@ -316,6 +327,8 @@ function doSplit(S,lid,idxs){
   const moving=idxs.map(i=>L.cre[i]), stay=L.cre.filter((_,i)=>!idxs.includes(i));
   if(moving.length<2||stay.length<2)return 'Each legion needs at least two creatures.';
   if(L.cre.length===8&&moving.length!==4)return 'The starting legion must split four and four.';
+  if(L.cre.length===8&&(moving.includes('Titan')===moving.includes('Angel')))return 'Rule 5.2: put your Titan in one legion and your Angel in the other.';
+  if(S.turn===1&&L.cre.length!==8)return 'Rule 5.2: starting legions may not be split again until your second turn.';
   const id=nextMarker(S,L.owner);if(!id)return 'You have no legion markers left.';
   L.cre=stay;S.legions[id]={id,owner:L.owner,land:L.land,cre:moving,moved:false,rec:false};
   log(S,`${seatName(S,L.owner)} splits ${lid} → ${id} (${moving.length}).`);
@@ -416,8 +429,9 @@ function defenderDecide(S,flee){
   const B0=E.battle;B0.rot=B0.terrain==='Tower'?-30:battleRot(E.land);
   if(B0.terrain==='Tower')B0.entryA=[0,1,2].find(i=>(BSIDES[i].n-30+360)%360===210);   // always the lower-left, opposite the name
   else B0.entryA=wideSideFor(E.land,A.entry!=null?A.entry:landDirs(E.land)[0]);
-  if(E.battle.terrain==='Tower'){const spots=['3-2','3-1','3-3','2-1','2-2','4-1','4-2'];E.battle.units.filter(u=>u.side==='D').forEach((u,i)=>{if(spots[i])u.hex=spots[i]})}
-  if(E.battle.terrain==='Tower')E.battle.side='A';
+  // 10.2: in the Tower the defender deploys inside the walls instead of its first maneuver (it starts on the
+  // walled hexes in a default order and may rearrange them), then the attacker takes the first maneuver
+  if(E.battle.terrain==='Tower'){E.battle.units.filter(u=>u.side==='D').forEach((u,i)=>{if(TOWER_SPOTS[i])u.hex=TOWER_SPOTS[i]});E.battle.phase='deploy'}
   snapManeuver(E.battle);
   log(S,E.battle.terrain==='Tower'?'Battle at the Tower! The defender holds the walls and skips its first maneuver.':`Battle in the ${E.battle.terrain}! The defender maneuvers first.`);
 }
@@ -510,6 +524,7 @@ function snapManeuver(B){B.snap=B.units.map(u=>[u.id,u.hex,u.moved])}
 function unitPower(S,u){return powerOf(S,u.owner,u.c)}
 function battleMoves(S,u){
   const B=S.eng.battle;
+  if(B.phase==='deploy')return u.side==='D'&&!u.dead?TOWER_SPOTS.filter(h=>!occ(B,h)):[];
   if(B.phase!=='man'||u.side!==B.side||u.moved||u.dead)return [];
   if(u.hex&&engaged(B,u))return [];
   const sk=skillOf(u.c),fly=flies(u.c),T=B.terrain,dist={},res=new Set();
@@ -538,8 +553,9 @@ function doBattleMove(S,uid,hex){
   if(!u||!battleMoves(S,u).includes(hex))return 'Illegal move.';
   u.hex=hex;u.moved=true;
 }
+const TOWER_SPOTS=['3-2','3-1','3-3','2-1','2-2','4-1','4-2'];
 function resetManeuver(S){
-  const B=S.eng.battle;if(B.phase!=='man')return;
+  const B=S.eng.battle;if(B.phase!=='man'&&B.phase!=='deploy')return;
   B.snap.forEach(([id,hex,moved])=>{const u=B.units.find(x=>x.id===id);if(u&&!u.dead&&u.side===B.side){u.hex=hex;u.moved=moved}});
   B.units.forEach(u=>{if(u.side===B.side&&!B.snap.some(s=>s[0]===u.id)){u.hex=null;u.moved=false}});
 }
@@ -589,7 +605,9 @@ function autoStrikes(S){
   }
 }
 function endManeuver(S){
-  const B=S.eng.battle;if(B.phase!=='man')return 'Not now.';
+  const B=S.eng.battle;
+  if(B.phase==='deploy'){B.side='A';B.phase='man';B.units.forEach(u=>u.moved=false);snapManeuver(B);log(S,'The defender has deployed inside the walls. The attacker enters.');return}
+  if(B.phase!=='man')return 'Not now.';
   if(B.side==='A'&&B.summonWin)B.summonDone=true;   // 15.3: the summoning option is used or lost now
   B.units.forEach(u=>{if(u.side===B.side&&!u.dead&&!u.hex){u.dead=true;log(S,`${u.c} failed to enter the battle and is lost.`)}});
   if(checkBattleEnd(S))return;
@@ -809,7 +827,52 @@ const myName=()=>ls.get('titan-name')||'';
 const rid=()=>Math.random().toString(36).slice(2,12);
 function firstSeen(m){if(!m||!m.mid)return true;if(seen.has(m.mid))return false;seen.add(m.mid);if(seen.size>500)seen=new Set([...seen].slice(-200));return true}
 function syncNames(){if(S&&S.seats)S.seats.forEach(s=>{if(s.uid&&s.name)names[s.uid]=s.name})}
-function persistHost(){if(isHost)ls.set('titan-host',{room,S,V,t:Date.now()})}
+/* ---- saved games: every hotseat and hosted game is kept in this browser; any game can also go to a file ---- */
+let curSave=null;   // id of the saved-game slot the current game writes to
+const MAX_SAVES=12;
+function getSaves(){const a=ls.get('titan-saves');return Array.isArray(a)?a:[]}
+function writeSaves(a){try{localStorage.setItem('titan-saves',JSON.stringify(a))}catch(e){
+  // storage full: drop the oldest finished games, then the oldest of all, and try again once
+  a.sort((x,y)=>(x.S.status==='over')-(y.S.status==='over')||y.t-x.t);while(a.length>1){a.pop();try{localStorage.setItem('titan-saves',JSON.stringify(a));return}catch(_){}}
+  toast('This browser is out of room for saved games. Use 💾 Save file to keep this one.')}}
+function autosave(){
+  if(!S||S.status==='lobby'||!curSave||(!local&&!isHost))return;
+  const a=getSaves().filter(x=>x.id!==curSave);
+  a.unshift({id:curSave,kind:local?'hotseat':'host',room:local?null:room,S,V,t:Date.now()});
+  writeSaves(a.slice(0,MAX_SAVES));
+}
+function deleteSave(id){writeSaves(getSaves().filter(x=>x.id!==id))}
+(function migrateOldSave(){const o=ls.get('titan-host');if(o&&o.S&&o.room&&!getSaves().some(x=>x.id==='r'+o.room)){
+  const a=getSaves();a.push({id:'r'+o.room,kind:'host',room:o.room,S:o.S,V:o.V,t:o.t||Date.now()});writeSaves(a)}
+  try{localStorage.removeItem('titan-host')}catch(e){}})();
+function persistHost(){if(isHost){curSave=curSave||('r'+room);autosave()}}
+function downloadSave(entry){
+  const st=entry?entry.S:S,v=entry?entry.V:V;if(!st)return;
+  const names=st.seats.map(x=>x.name||(x.color!=null?COLORS[x.color].n:'')).filter(Boolean).join('-').replace(/[^A-Za-z0-9-]/g,'').slice(0,40);
+  const d=new Date(),stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const blob=new Blob([JSON.stringify({titanSave:1,S:st,V:v,room:entry?entry.room:(local?null:room),saved:Date.now()})],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`titan-${names||'game'}-turn${st.turn||0}-${stamp}.titan.json`;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast('Save file downloaded.');
+}
+function loadSaveFile(file){
+  const r=new FileReader();
+  r.onload=()=>{let d;try{d=JSON.parse(r.result)}catch(e){return toast('That file is not a Titan save.')}
+    if(!d||!d.S||!d.S.seats||!d.S.legions)return toast('That file is not a Titan save.');
+    const st=d.S;
+    modal(`<h2>Load saved game</h2><p>Turn ${st.turn}${st.status==='over'?' (finished)':''} · ${st.seats.map((x,i)=>`<b>${esc(x.name||COLORS[x.color].n)}</b> (${COLORS[x.color].n})`).join(', ')}</p>
+      <div class="row"><button class="alt" id="ldHot">Continue on this screen (hotseat)</button></div>
+      <p class="muted" style="font-size:14px;margin-top:12px">Or host it online. Choose which player you are; everyone else joins your new room code using the <b>same name</b> they had before to get their seat back.</p>
+      <div class="row">${st.seats.map((x,i)=>`<button data-ldseat="${i}"><span class="sw" style="display:inline-block;vertical-align:middle;background:${COLORS[x.color].c}"></span> I'm ${esc(x.name||COLORS[x.color].n)}</button>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><button class="alt" id="ldX">Cancel</button></div>`,(m,close)=>{
+        m.querySelector('#ldX').onclick=close;
+        m.querySelector('#ldHot').onclick=()=>{close();st.seats.forEach((x,i)=>x.uid='local'+i);local=true;isHost=false;S=st;V=d.V||0;curSave='h'+Date.now().toString(36);mode='game';sel={};autosave();render()};
+        m.querySelectorAll('[data-ldseat]').forEach(b=>b.onclick=()=>{close();const i=+b.dataset.ldseat;
+          st.seats.forEach((x,k)=>{x.uid=k===i?me:'file'+k;if(!x.name)x.name=COLORS[x.color].n});st.seats[i].name=myName()||st.seats[i].name;st.host=me;
+          curSave=null;hostGame(0,{room:null,S:st,V:d.V||1})});
+      });
+  };
+  r.readAsText(file);
+}
 function setStat(k,v){netStat[k]=v;const e=document.getElementById('netStat');if(e)e.innerHTML=netStatHTML()}
 function netStatHTML(){return `Direct link: <b>${netStat.direct}</b> · Relay: <b>${netStat.relay}</b> · Host: <b>${netStat.host}</b>`}
 function isOnline(uid){return uid===me||conns.some(c=>c.uid===uid&&c.open)||(lastSeen[uid]&&Date.now()-lastSeen[uid]<30000)}
@@ -840,7 +903,7 @@ async function act(fn){
   if(busy)return;
   const S2=clone(S);const err=fn(S2);
   if(typeof err==='string'){toast(err);return}
-  if(local){S=S2;render();return}
+  if(local){S=S2;autosave();render();return}
   if(isHost){if(S.status==='play'){const a=actor(S);if(a==null||S.seats[a].uid!==me){toast('It is not your turn.');return}}
     S=S2;V++;syncNames();persistHost();broadcast();render();return}
   busy=true;pending=setTimeout(()=>{busy=false;toast('The host did not answer. Check that the host still has the game open, then try again.')},10000);
@@ -857,7 +920,11 @@ function onHostMsg(m,c){
   if(m.t==='hello'){
     if(S.status==='lobby'){let seat=S.seats.find(s=>s.uid===uid)||S.seats.find(s=>!s.uid);
       if(seat){seat.uid=uid;seat.name=(m.name||'Player').slice(0,24);V++;persistHost()}}
-    else{const seat=S.seats.find(s=>s.uid===uid);if(seat&&m.name)seat.name=m.name.slice(0,24)}
+    else{let seat=S.seats.find(s=>s.uid===uid);
+      // a player rejoining a loaded game (or from another browser) gets back the seat with their name
+      if(!seat&&m.name){const nm=m.name.trim().toLowerCase();seat=S.seats.find(s=>(s.name||'').trim().toLowerCase()===nm&&s.uid!==me&&!isOnline(s.uid));
+        if(seat){seat.uid=uid;V++;persistHost();log(S,`${seat.name} rejoins as ${COLORS[seat.color].n}.`)}}
+      if(seat&&m.name)seat.name=m.name.slice(0,24)}
     syncNames();broadcast();render();return}
   if(m.t==='commit'){
     if(m.base!==V){replyReject(c,uid,'stale');return}
@@ -879,9 +946,9 @@ function setupPeer(id,onOpen){
 }
 function hostGame(n,resume){
   local=false;isHost=true;
-  if(resume){room=resume.room;S=resume.S;V=resume.V}
+  if(resume){room=resume.room||Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');S=resume.S;V=resume.V;curSave='r'+room}
   else{room=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
-    S=newLobby(n,me);S.seats[0].uid=me;S.seats[0].name=myName()||'Host';V=1}
+    S=newLobby(n,me);S.seats[0].uid=me;S.seats[0].name=myName()||'Host';V=1;curSave='r'+room}
   syncNames();persistHost();mode='game';sel={};render();
   setupPeer(PREFIX+room,()=>{broadcast()});
   if(peer)peer.on('connection',c=>{conns.push(c);
@@ -914,21 +981,30 @@ function joinRoom(code){
   setTimeout(()=>{if(!S&&mode==='game')setStat('host','not answering — is the host on the waiting screen with this code?')},20000);
 }
 function scheduleRetry(){clearTimeout(retryT);retryT=setTimeout(()=>{if(mode==='game'&&!isHost&&peer&&!peer.destroyed&&!(hostConn&&hostConn.open))connectDirect()},4000)}
-function backToLobby(){try{peer&&peer.destroy()}catch(e){}mqs.forEach(c=>{try{c.end(true)}catch(e){}});mqs=[];peer=null;conns=[];hostConn=null;isHost=false;
+$('#btnSaveFile').onclick=()=>downloadSave(null);
+function backToLobby(){curSave=null;try{peer&&peer.destroy()}catch(e){}mqs.forEach(c=>{try{c.end(true)}catch(e){}});mqs=[];peer=null;conns=[];hostConn=null;isHost=false;
   clearTimeout(retryT);clearInterval(pingT);mode='lobby';S=null;local=false;render()}
 $('#btnLobby').onclick=backToLobby;
 
 /* ================= LOBBY ================= */
 function renderLobby(){
-  $('#btnLobby').style.display='none';$('#hdrInfo').textContent='';
-  const saved=ls.get('titan-host'),lastRoom=ls.get('titan-room')||'',hashRoom=(location.hash.match(/^#room-([A-Z0-9]+)/i)||[])[1]||'';
+  $('#btnLobby').style.display='none';$('#btnSaveFile').style.display='none';$('#hdrInfo').textContent='';
+  const saves=getSaves(),lastRoom=ls.get('titan-room')||'',hashRoom=(location.hash.match(/^#room-([A-Z0-9]+)/i)||[])[1]||'';
   $('#main').innerHTML=`<div class="lobby parch">
     <h2>The Lands of Titan</h2>
     <p>Lead your Titan and its legions across the Masterboard, muster ever-mightier creatures, and crush your rivals on the battlelands. The last Titan standing wins.</p>
     <div class="row"><span class="cinzel">Your name</span><input id="myName" maxlength="24" value="${esc(myName())}" placeholder="e.g. Sam" style="font:inherit;padding:5px 8px;border:1px solid #9c7a4a;border-radius:4px;background:#fffaf0"></div>
+    <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Saved games</h3>
+    ${saves.length?saves.map(g=>{const st=g.S,ago=Math.round((Date.now()-g.t)/60000);
+      const when=ago<1?'just now':ago<60?ago+' min ago':ago<1440?Math.round(ago/60)+' h ago':Math.round(ago/1440)+' days ago';
+      return `<div class="gameRow"><div class="seats">${st.seats.map(x=>`<span class="seatTag" style="background:${COLORS[x.color]?COLORS[x.color].c:'#7a6248'};${x.alive===false?'opacity:.45;text-decoration:line-through':''}">${esc(x.name||(COLORS[x.color]||{}).n||'Player')}</span>`).join('')}</div>
+        <span class="muted" style="font-size:14px;flex:1">${g.kind==='hotseat'?'Hotseat':'Online · room '+esc(g.room)} · ${st.status==='over'?'finished':'turn '+st.turn} · saved ${when}</span>
+        ${st.status!=='over'?`<button data-cont="${g.id}">Continue</button>`:''}<button class="alt" data-dl="${g.id}" title="Download a save file">💾</button><button class="danger" data-delsave="${g.id}" title="Delete">✕</button></div>`}).join('')
+      :'<p class="muted" style="font-size:14.5px">Games you play here are saved automatically and will appear in this list.</p>'}
+    <div class="row" style="margin-top:6px"><label class="alt" style="font-family:Cinzel;font-weight:700;font-size:13px;padding:7px 12px;border:1px solid #5b3a1a;border-radius:4px;cursor:pointer;background:linear-gradient(#efe4cc,#cdbb96)">📂 Load a save file<input type="file" id="loadFile" accept=".json,application/json" style="display:none"></label></div>
     <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Host an online game</h3>
     <div class="row"><select id="nPlayers">${[2,3,4,5,6].map(n=>`<option ${n===4?'selected':''}>${n}</option>`).join('')}</select><span>players</span><button id="btnHost">Host game</button>
-      ${saved&&saved.S?`<button class="alt" id="btnResume">Resume hosted game ${esc(saved.room)} (turn ${saved.S.turn||'—'})</button>`:''}</div>
+</div>
     <p class="muted" style="font-size:14.5px">You'll get a 5-letter room code. Send your friends this game file (or its web address, if you've put it online) and the code. No accounts needed. Keep your browser open while you play: your browser runs the game.</p>
     <h3 class="cinzel" style="margin:18px 0 4px;color:var(--bronze)">Join a friend's game</h3>
     <div class="row"><input id="roomCode" maxlength="5" value="${esc(hashRoom||lastRoom)}" placeholder="ROOM" style="font:inherit;font-family:Cinzel;letter-spacing:.2em;width:110px;padding:5px 8px;border:1px solid #9c7a4a;border-radius:4px;background:#fffaf0;text-transform:uppercase"><button id="btnJoin">Join</button></div>
@@ -938,9 +1014,14 @@ function renderLobby(){
   </div>`;
   const saveName=()=>ls.set('titan-name',$('#myName').value.trim().slice(0,24));
   $('#myName').onchange=saveName;
-  $('#btnLocal').onclick=()=>{local=true;S=newLobby(+$('#nLocal').value,'local');S.seats.forEach((s,i)=>s.uid='local'+i);startGame(S);V=0;mode='game';sel={};render()};
-  $('#btnHost').onclick=()=>{saveName();if(!myName())return toast('Enter your name first.');if(saved&&saved.S&&saved.S.status==='play')return confirmBox('Hosting a new game will replace your saved hosted game. Continue?',()=>hostGame(+$('#nPlayers').value));hostGame(+$('#nPlayers').value)};
-  const r=$('#btnResume');if(r)r.onclick=()=>{saveName();hostGame(0,saved)};
+  $('#btnLocal').onclick=()=>{local=true;isHost=false;S=newLobby(+$('#nLocal').value,'local');S.seats.forEach((s,i)=>{s.uid='local'+i});startGame(S);V=0;curSave='h'+Date.now().toString(36);mode='game';sel={};autosave();render()};
+  document.querySelectorAll('[data-cont]').forEach(b=>b.onclick=()=>{const g=getSaves().find(x=>x.id===b.dataset.cont);if(!g)return;saveName();
+    if(g.kind==='hotseat'){local=true;isHost=false;S=g.S;V=g.V;curSave=g.id;mode='game';sel={};render()}
+    else{if(!myName())return toast('Enter your name first.');curSave=g.id;hostGame(0,{room:g.room,S:g.S,V:g.V})}});
+  document.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const g=getSaves().find(x=>x.id===b.dataset.dl);if(g)downloadSave(g)});
+  document.querySelectorAll('[data-delsave]').forEach(b=>b.onclick=()=>confirmBox('Delete this saved game from this browser? (A downloaded save file is not affected.)',()=>{deleteSave(b.dataset.delsave);render()}));
+  $('#loadFile').onchange=e=>{const f=e.target.files[0];if(f){saveName();loadSaveFile(f)}e.target.value=''};
+  $('#btnHost').onclick=()=>{saveName();if(!myName())return toast('Enter your name first.');hostGame(+$('#nPlayers').value)};
   $('#btnJoin').onclick=()=>{saveName();const c=$('#roomCode').value.trim();if(!myName())return toast('Enter your name first.');if(c.length<5)return toast('Enter the 5-letter room code.');joinRoom(c)};
 }
 /* ================= BOARD ZOOM & PAN ================= */
@@ -984,55 +1065,63 @@ function setupZoom(){
 function zoomControls(){return `<div class="zctl"><button class="alt zin" title="Zoom in">+</button><button class="alt zout" title="Zoom out">−</button><button class="alt zreset" title="Show the whole board">⤢</button><span class="zpct">100%</span></div>`}
 
 /* ================= REFERENCE CHARTS ================= */
-const MUSTER_POS={Colossus:[350,46],Giant:[140,170],Hydra:[262,186],Dragon:[392,186],Serpent:[586,52],
-  Wyvern:[64,292],Unicorn:[262,292],Griffon:[456,306],Behemoth:[586,196],
-  Warbear:[150,412],Ranger:[268,412],Minotaur:[380,412],Gorgon:[668,320],Cyclops:[586,446],
-  Troll:[64,548],Ogre:[204,604],Centaur:[346,604],Lion:[470,524],Gargoyle:[586,604]};
+const MUSTER_POS={Colossus:[520,62],Giant:[230,230],Hydra:[430,250],Dragon:[660,250],Serpent:[1010,62],
+  Wyvern:[80,420],Unicorn:[430,430],Griffon:[810,430],Behemoth:[1010,300],
+  Warbear:[220,610],Ranger:[430,610],Minotaur:[640,610],Gorgon:[1100,500],Cyclops:[1010,640],
+  Troll:[80,820],Ogre:[300,900],Centaur:[560,900],Lion:[820,800],Gargoyle:[1010,900]};
 function terrainsOf(c){return Object.keys(TREES).filter(t=>t!=='Tower'&&TREES[t].some(([x])=>x===c))}
 function musterSVG(){
-  const W=94,H=58,P=MUSTER_POS;let lines='',labels='',boxes='',defs='';
+  const W=108,H=66,P=MUSTER_POS;let lines='',labels='',boxes='',defs='';
   const pairs={};
   for(const t in TREES){if(t==='Tower')continue;const tr=TREES[t];
     for(let k=1;k<tr.length;k++){const a=tr[k-1][0],b=tr[k][0],key=[a,b].sort().join();(pairs[key]=pairs[key]||[]).push({t,a,b,n:tr[k][1]})}}
+  // distance from a box centre to its edge along (dx,dy)
+  const edge=(dx,dy)=>{const ax=Math.abs(dx)||1e-9,ay=Math.abs(dy)||1e-9;return Math.min(W/2/ax,H/2/ay)};
+  const pill=(x,y,ang,txt,size,fill,col)=>{const w=txt.length*size*.72+14;
+    return `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${ang.toFixed(1)})"><rect x="${-w/2}" y="${-size*.75}" width="${w}" height="${size*1.5}" rx="${size*.75}" fill="${fill}" stroke="${col}" stroke-width="1.2"/><text text-anchor="middle" dy="${size*.36}" font-family="Cinzel" font-weight="900" font-size="${size}" fill="#1d130b">${txt}</text></g>`};
   for(const key in pairs){const list=pairs[key];
-    list.forEach((e,i)=>{const [x1,y1]=P[e.a],[x2,y2]=P[e.b],len=Math.hypot(x2-x1,y2-y1),nx=-(y2-y1)/len,ny=(x2-x1)/len,o=(i-(list.length-1)/2)*9;
-      const ax=x1+nx*o,ay=y1+ny*o,bx=x2+nx*o,by=y2+ny*o,col=TER[e.t].c;
-      lines+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#2a1d12" stroke-width="9" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${col}" stroke-width="6" stroke-linecap="round"/>`;
-      const mx=(ax+bx)/2,my=(ay+by)/2;let ang=Math.atan2(by-ay,bx-ax)*180/Math.PI;if(ang>90)ang-=180;if(ang<-90)ang+=180;
-      labels+=`<text transform="translate(${mx+nx*(o>=0?11:-11)},${my+ny*(o>=0?11:-11)}) rotate(${ang})" text-anchor="middle" dy="3" font-family="Cinzel" font-weight="700" font-size="9.5" fill="#2a1d12">${e.t.toUpperCase()}</text>`;
-      const f=.30,lx=ax+(bx-ax)*f,ly=ay+(by-ay)*f;   // count sits near the lesser creature
-      labels+=`<g transform="translate(${lx+nx*(o>=0?13:-13)},${ly+ny*(o>=0?13:-13)})"><circle r="9" fill="#f6ead0" stroke="#2a1d12" stroke-width=".8"/><text text-anchor="middle" dy="3.5" font-family="Cinzel" font-weight="900" font-size="9.5" fill="#2a1d12">×${e.n}</text></g>`;
+    list.forEach((e,i)=>{const [x1,y1]=P[e.a],[x2,y2]=P[e.b],len=Math.hypot(x2-x1,y2-y1),ux=(x2-x1)/len,uy=(y2-y1)/len,nx=-uy,ny=ux,o=(i-(list.length-1)/2)*30;
+      const ax=x1+nx*o,ay=y1+ny*o,bx=x2+nx*o,by=y2+ny*o,col=TER[e.t].c,dk=TER[e.t].d;
+      lines+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#2a1d12" stroke-width="10" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${col}" stroke-width="7" stroke-linecap="round"/>`;
+      // visible stretch of the line, between the two boxes
+      const s0=edge(ux,uy),s1=len-edge(ux,uy);
+      let ang=Math.atan2(uy,ux)*180/Math.PI;if(ang>90)ang-=180;if(ang<-90)ang+=180;
+      const mid=(s0+s1)/2;               // terrain name and count together, mid-way along the visible line
+      labels+=pill(ax+ux*mid,ay+uy*mid,ang,e.t.toUpperCase()+' ×'+e.n,13,'#fffaf0',dk);
     })}
   for(const c in P){const [x,y]=P[c],ts=terrainsOf(c),id='mg-'+c;
     defs+=`<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${ts.map((t,i)=>`<stop offset="${(i/ts.length*100).toFixed(0)}%" stop-color="${TER[t].c}"/><stop offset="${((i+1)/ts.length*100).toFixed(0)}%" stop-color="${TER[t].c}"/>`).join('')}</linearGradient>`;
-    boxes+=`<g transform="translate(${x-W/2},${y-H/2})"><rect x="2" y="3" width="${W}" height="${H}" rx="5" fill="#000" opacity=".35"/>
-      <rect width="${W}" height="${H}" rx="5" fill="url(#${id})" stroke="#2a1d12" stroke-width="1.5"/>
-      <rect x="4" y="15" width="${W-8}" height="${H-19}" rx="3" fill="#f6ead0" opacity=".9"/>
-      <text x="${W/2}" y="11.5" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="10" fill="#1d130b">${c.toUpperCase()}</text>
-      <text x="${W/2}" y="40" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="20" fill="${CRE_COL[c]}">${c[0]}</text>
-      <text x="8" y="${H-6}" font-family="Cinzel" font-weight="900" font-size="13" fill="#1d130b">${CRE[c][0]}</text>
-      <text x="${W-8}" y="${H-6}" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="13" fill="#1d130b">${CRE[c][1]}</text>
-      <text x="${W/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="#1d130b">${ranges(c)?'➶':''}${flies(c)?'⟆':''}</text></g>`}
-  return `<svg viewBox="0 0 720 664" style="display:block;margin:0 auto;width:100%;max-height:72vh;background:#efe2c2;border-radius:6px"><defs>${defs}</defs>${lines}${labels}${boxes}
-    <text x="10" y="656" font-family="EB Garamond" font-size="12" fill="#2a1d12">➶ rangestrikes   ⟆ flies   ×N = how many of the lesser creature a legion needs to muster the greater one in that terrain</text></svg>`;
+    boxes+=`<g transform="translate(${x-W/2},${y-H/2})"><rect x="2" y="3" width="${W}" height="${H}" rx="6" fill="#000" opacity=".35"/>
+      <rect width="${W}" height="${H}" rx="6" fill="url(#${id})" stroke="#2a1d12" stroke-width="1.8"/>
+      <rect x="5" y="18" width="${W-10}" height="${H-23}" rx="3" fill="#f6ead0" opacity=".93"/>
+      <text x="${W/2}" y="13.5" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="12" fill="#1d130b">${c.toUpperCase()}</text>
+      <text x="${W/2}" y="47" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="23" fill="${CRE_COL[c]}">${c[0]}</text>
+      <text x="10" y="${H-8}" font-family="Cinzel" font-weight="900" font-size="15" fill="#1d130b">${CRE[c][0]}</text>
+      <text x="${W-10}" y="${H-8}" text-anchor="end" font-family="Cinzel" font-weight="900" font-size="15" fill="#1d130b">${CRE[c][1]}</text>
+      <text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="12" fill="#1d130b">${ranges(c)?'➶':''}${flies(c)?'⟆':''}</text></g>`}
+  return `<svg viewBox="0 0 1170 990" style="display:block;margin:0 auto;width:100%;max-height:80vh;background:#efe2c2;border-radius:6px"><defs>${defs}</defs>${lines}${labels}${boxes}
+    <text x="14" y="978" font-family="EB Garamond" font-size="15" fill="#2a1d12">➶ rangestrikes   ⟆ flies   TERRAIN ×N = a legion with N of the lower creature may muster the higher one in that terrain.</text></svg>`;
 }
 const STRIKE_TN=(a,d)=>Math.max(1,Math.min(6,4-a+d));
 function strikeTableHTML(){
   return `<table class="ref"><tr><th rowspan="2">Defender's<br>skill</th><th colspan="5">Attacker's skill</th></tr><tr>${[1,2,3,4,5].map(a=>`<th>${a}</th>`).join('')}</tr>
     ${[2,3,4].map(d=>`<tr><th>${d}</th>${[1,2,3,4,5].map(a=>`<td>${STRIKE_TN(a,d)}</td>`).join('')}</tr>`).join('')}</table>
-    <p class="muted" style="font-size:13.5px">Roll dice equal to the striker's power; each die showing the number or higher is a hit. A creature dies when its hits equal its power.</p>`;
+    <p class="muted" style="font-size:13.5px;max-width:330px">Roll dice equal to the striker's power; each die showing the number or higher is a hit. A creature dies when its hits equal its power.</p>`;
 }
-function rangeHTML(){
+function rangeTableHTML(){
   const rs=Object.keys(CRE).filter(c=>ranges(c)).sort((a,b)=>CRE[b][0]-CRE[a][0]);
   return `<table class="ref"><tr><th>Rangestriker</th><th>Strength (dice)</th><th>Skill</th><th>Furthest range</th></tr>
     ${rs.map(c=>`<tr><td style="text-align:left">${c}</td><td>${Math.floor(CRE[c][0]/2)}</td><td>${CRE[c][1]}</td><td>${Math.min(4,CRE[c][1])}</td></tr>`).join('')}</table>
-    <svg viewBox="0 0 240 210" style="width:260px;max-width:100%;display:block;margin:8px 0">${(()=>{let g='';const R=16,cx=120,cy=105;
+`;
+}
+function rangeInfoHTML(){
+  return `<svg viewBox="0 0 240 210" style="width:230px;flex:0 0 230px;display:block;margin:0">${(()=>{let g='';const R=16,cx=120,cy=105;
       for(let q=-3;q<=3;q++)for(let r=-3;r<=3;r++){const d=Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r));if(d>3)continue;
         const x=cx+R*1.5*q,y=cy+R*Math.sqrt(3)*(r+q/2);
         g+=`<polygon points="${Array.from({length:6},(_,i)=>{const a=i*Math.PI/3;return (x+(R-1)*Math.cos(a)).toFixed(1)+','+(y+(R-1)*Math.sin(a)).toFixed(1)}).join(' ')}" fill="${d===0?'#c9a24a':d===1?'#e9d8b4':d===2?'#f6ead0':'#efdcb0'}" stroke="#5b3d1f"/>`;
         if(d>0)g+=`<text x="${x}" y="${y+4}" text-anchor="middle" font-family="Cinzel" font-weight="900" font-size="11" fill="${d===1?'#a8231a':'#2a1d12'}">${d===1?'×':d+1}</text>`}
       return g})()}</svg>
-    <ul style="font-size:14px;margin:4px 0 0 18px;padding:0">
+    <ul style="font-size:14px;margin:0 0 0 18px;padding:0;flex:1;min-width:220px;line-height:1.4">
       <li>Range counts the striker's hex and the target's hex: one empty hex between them is range 3 (shown on the diagram from the gold hex).</li>
       <li>Furthest range is 4, and never more than the striker's skill. At range 4 the striker loses 1 skill.</li>
       <li>Only the moving player rangestrikes, only with creatures not in contact with an enemy, and never at an adjacent target (×).</li>
@@ -1079,7 +1168,11 @@ function hazardsHTML(){
 const CHART_TABS=[['muster','Muster chart'],['strike','Strike & rangestrike'],['hazards','Hazards & natives'],['chars','Character chart']];
 function chartsModal(tab){
   tab=tab||chartsModal.last||'muster';chartsModal.last=tab;
-  const body={muster:musterSVG,strike:()=>`<div class="row" style="align-items:flex-start;gap:22px"><div><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">Strike chart</h3>${strikeTableHTML()}</div><div style="flex:1;min-width:260px"><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">Rangestrike chart</h3>${rangeHTML()}</div></div>`,hazards:hazardsHTML,chars:characterHTML}[tab]();
+  const body={muster:musterSVG,strike:()=>`<div style="display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:28px;align-items:start">
+    <div><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">Strike chart</h3>${strikeTableHTML()}
+      <h3 class="cinzel" style="color:var(--bronze);margin:14px 0 4px">Rangestrike chart</h3>${rangeTableHTML()}</div>
+    <div><h3 class="cinzel" style="color:var(--bronze);margin:4px 0">How rangestriking works</h3>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">${rangeInfoHTML()}</div></div></div>`,hazards:hazardsHTML,chars:characterHTML}[tab]();
   modal(`<div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="row" style="gap:4px">${CHART_TABS.map(([k,l])=>`<button class="${k===tab?'':'alt'}" data-ctab="${k}">${l}</button>`).join('')}</div><button class="alt" id="chX">Close ✕</button></div>
     <div style="max-height:76vh;overflow:auto">${body}</div>`,(r,close)=>{
       r.querySelector('.modal').classList.add('wide');
@@ -1103,10 +1196,10 @@ function splitModal(lid){
     r.querySelector('#spA').innerHTML=L.cre.map((c,i)=>picked.has(i)?'':chitHTML(c,{cls:'pick',attrs:`data-i="${i}"`,power:powerOf(S,L.owner,c)})).join('');
     r.querySelector('#spB').innerHTML=L.cre.map((c,i)=>picked.has(i)?chitHTML(c,{cls:'pick',attrs:`data-i="${i}"`,power:powerOf(S,L.owner,c)}):'').join('')||'<span class="muted">Click creatures to move them here</span>';
     r.querySelectorAll('[data-i]').forEach(e=>e.onclick=()=>{const i=+e.dataset.i;picked.has(i)?picked.delete(i):picked.add(i);draw(r)});
-    const n=picked.size;r.querySelector('#spOk').disabled=n<2||L.cre.length-n<2||(L.cre.length===8&&n!==4);
+    const n=picked.size,mv=[...picked].map(i=>L.cre[i]);r.querySelector('#spOk').disabled=n<2||L.cre.length-n<2||(L.cre.length===8&&(n!==4||mv.includes('Titan')===mv.includes('Angel')));
   };
   modal(`<h2>Split legion ${lid}</h2>
-    <p class="muted">${L.cre.length===8?'Your starting legion must split into two legions of four. Tip: keep the Titan and the Angel apart.':'Each new legion needs at least two creatures.'}</p>
+    <p class="muted">${L.cre.length===8?'Your starting legion splits into two legions of four: your Titan in one, your Angel in the other (rule 5.2).':'Each new legion needs at least two creatures.'}</p>
     <div class="cinzel" style="font-size:13px">${lid} keeps</div><div class="chits" id="spA" style="min-height:62px;margin:4px 0 10px"></div>
     <div class="cinzel" style="font-size:13px">New legion</div><div class="chits" id="spB" style="min-height:62px;margin:4px 0 12px"></div>
     <div class="row"><button id="spOk">Split</button><button class="alt" id="spX">Cancel</button></div>`,(r,close)=>{
@@ -1124,7 +1217,7 @@ function pickModal(title,items,cb,note=''){
 /* ================= RENDER: GAME ================= */
 function render(){
   if(mode==='lobby'){renderLobby();return}
-  $('#btnLobby').style.display='';
+  $('#btnLobby').style.display='';$('#btnSaveFile').style.display=S&&S.status!=='lobby'?'':'none';
   if(!S){$('#main').innerHTML=`<div class="lobby parch"><h2>Joining room ${esc(room||'')}…</h2><p id="netStat" class="muted">${netStatHTML()}</p>
     <p class="muted" style="font-size:14.5px">Only one route needs to work. If the host still isn't found after about 20 seconds, check the room code and make sure the host has the game open on its waiting screen.</p></div>`;return}
   if(S.status==='lobby'){renderWaiting();return}
@@ -1295,7 +1388,11 @@ function trayHTML(){
 /* ---------- side panel ---------- */
 function sideHTML(){
   const a=actor(S),mine=myTurn();
-  let h=`<div class="parch card players"><h3>Players</h3>${S.seats.map((s,i)=>`<div class="p ${i===S.cur&&S.status==='play'?'cur':''} ${s.alive?'':'dead'}">
+  let h=S.setup&&S.turn===1&&S.status==='play'?`<div class="parch card"><h3>Starting rolls (rule 5.1)</h3>
+    ${S.seats.map((s,i)=>`<div style="display:flex;gap:5px;align-items:center;margin:3px 0;flex-wrap:nowrap;white-space:nowrap"><span class="sw" style="background:${COLORS[s.color].c}"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis">${esc(pname(i))}</span>
+      ${(s.rolls||[]).map((r,k,a)=>`<span class="die sm" style="${k<a.length-1?'opacity:.45;text-decoration:line-through':''}">${r}</span>`).join('')}<span style="min-width:96px">→ <b>Tower ${s.towerRoll*100}</b></span><span style="width:16px;color:var(--blood)" title="${i===0?'plays first':''}">${i===0?'★':''}</span></div>`).join('')}
+    <div class="muted" style="font-size:12.5px;margin-top:4px">Crossed-out dice were re-rolled because that Tower was already taken or another player rolled the same number. ★ Highest Tower plays first.</div></div>`:'';
+  h+=`<div class="parch card players"><h3>Players</h3>${S.seats.map((s,i)=>`<div class="p ${i===S.cur&&S.status==='play'?'cur':''} ${s.alive?'':'dead'}">
       <span class="sw" style="background:${COLORS[s.color].c}"></span><span>${esc(pname(i))}${mySeats().includes(i)&&!local?' <i>(you)</i>':''}${!local&&isHost&&s.uid!==me&&!isOnline(s.uid)?' <i title="not connected">⚠</i>':''}</span>
       <span class="muted" style="font-size:13px">${legionsOf(S,i).length} leg.</span><span class="score">${s.score}</span></div>`).join('')}</div>`;
   h+=`<div class="parch card">`;
@@ -1370,7 +1467,7 @@ function legionButtons(L){
   if(!myTurn()||L.owner!==S.cur||S.eng)return '';
   let b='';
   if(S.phase==='split'){
-    if(L.cre.length>=4)b+=`<button data-split="${L.id}">Split…</button>`;
+    if(L.cre.length>=4&&(S.turn>1||L.cre.length===8))b+=`<button data-split="${L.id}">Split…</button>`;
     legionsAt(S,L.land).filter(x=>x.owner===L.owner&&x.id!==L.id).forEach(x=>b+=`<button class="alt" data-merge="${x.id}">Merge ${x.id} back</button>`);
   }
   if(S.phase==='move'&&L.moved)b+=`<button class="alt" data-undo="${L.id}">Undo move</button>`;
@@ -1379,13 +1476,17 @@ function legionButtons(L){
 function battlePanel(){
   const E=S.eng,B=E.battle,mine=myTurn(),a=actor(S);
   const sideName=s=>s==='A'?'Attacker':'Defender';
-  const ph={man:'Maneuver',str:'Strike',sb:'Strikeback'}[B.phase],ss=B.phase==='sb'?other(B.side):B.side;
+  const ph={deploy:'Deployment',man:'Maneuver',str:'Strike',sb:'Strikeback'}[B.phase],ss=B.phase==='sb'?other(B.side):B.side;
   let h=`<h3>Battle · ${sideName(ss)} ${ph}</h3><p><b>${esc(pname(a))}</b> ${mine?'(you) ':''}is acting.</p><p class="muted" style="font-size:13px;margin:-4px 0 6px">A tag above a creature names the hazard it stands on; ✓ means it is a native there.</p>`;
   const lr=S.lastRoll;
   if(lr)h+=`<div style="margin:6px 0"><div style="font-size:14px">${lr.who} → ${lr.tgt}${lr.range?' (range)':''}, need ${lr.tn}+: <b>${lr.hits} hit${lr.hits===1?'':'s'}</b>${lr.kill?' — slain!':''}${lr.carry?`<br><i>Carry-over:${esc(lr.carry)}</i>`:''}</div>
     <div class="row" style="gap:3px;margin-top:3px">${lr.rolls.map(r=>`<span class="die sm ${r>=lr.tn?'hit':''}">${r}</span>`).join('')}</div></div>`;
   if(!mine)return h+'<p class="muted">Waiting for their move…</p>';
-  if(B.phase==='man'){
+  if(B.phase==='deploy'){
+    h+=`<p><b>Deploy inside the Tower walls</b> (rule 10.2). Your creatures stand on the walled hexes; to rearrange them, click a creature and then an empty walled hex. The centre is the raised keep. This replaces your first maneuver; the attacker enters next.</p>
+      <div class="row"><button id="bEndMan">Done deploying</button><button class="alt" id="bResetMan">Reset</button></div>`;
+  }
+  else if(B.phase==='man'){
     h+=`<p>Click a creature (or one waiting to enter below the board), then a glowing hex. Creatures already next to an enemy can't move; others may move past enemies. Any creature not on the board when you finish is lost.</p>
       <div class="row"><button id="bEndMan">Done maneuvering</button><button class="alt" id="bResetMan">Reset moves</button>
       ${summonOptions(S).length?'<button class="alt" id="bSummon">Summon angel (now or never)</button>':''}
@@ -1497,7 +1598,7 @@ function rulesHTML(){
   <p><b>Turn.</b> Split legions (2+ creatures each, max 7) → roll and move legions <i>exactly</i> that many lands. <b>Exits</b> (board legend): starting a move, a legion may leave through a circle (●), single arrow or triple arrows — but if its land has a block (■) it must leave through the block. Continuing, it must follow triple arrows where its land has them, otherwise a single arrow, and may never backtrack. A legion must use its full roll, except that its move ends as soon as it enters a land held by an enemy legion (an engagement). It may pass through, but not stop on, a land held by another of your legions → resolve engagements → muster one creature in each legion that moved.</p>
   <p><b>Teleport.</b> On a 6, a legion with a Lord in a Tower may teleport to any empty Tower. With 400+ points, your Titan's legion may teleport onto any enemy legion. One teleport per turn.</p>
   <p><b>Mustering.</b> Each terrain has a recruit tree. You may muster a creature if the legion already has one of it, has enough of the next-lower creature (number shown), or has a higher creature in that tree. Towers muster Centaur, Gargoyle or Ogre freely; a Guardian with three of one kind; a Warlock with your Titan.</p>
-  <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender moves first. The attacker enters on the wide side matching the border it crossed into the land (chosen freely after a Titan teleport); the defender enters on the narrow side opposite. In the Tower the attacker always enters on the lower left. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender starts inside and skips its first maneuver. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
+  <p><b>Battle.</b> Creatures may move past enemies; only those adjacent at the start of a maneuver are locked in contact. Up to 7 rounds; the defender moves first. The attacker enters on the wide side matching the border it crossed into the land (chosen freely after a Titan teleport); the defender enters on the narrow side opposite. In the Tower the attacker always enters on the lower left. If the attacker hasn't won after 7 rounds it is destroyed and the defender scores nothing (time-loss). Rangestrike range counts both hexes and may not exceed 4 or the striker's skill; at range 4 the striker loses 1 skill. Extra hits from a killing blow carry over to another adjacent enemy that needs no higher strike number. The attacker may summon an Angel only in the first maneuver after a defender falls (or after winning). In the Tower the defender deploys its creatures inside the walls in place of its first maneuver, choosing where each stands. Creatures move up to their skill in hexes, stop when they come next to an enemy, and fliers pass over others. Each strike rolls dice equal to power; each die at or above 4 − your skill + target skill is a hit. A creature dies when its hits reach its power. <b>Battlelands</b> (per the hazard chart): <i>Tree</i> — no one may stop there; blocks rangestrikes. <i>Bog</i> — only natives may enter (fliers may cross). <i>Volcano</i> — Dragons only; a Dragon there adds 2 dice. <i>Slowed</i> means the hex counts as two hexes of movement. <i>Brambles</i> — slow non-natives; a native defending in brambles is +1 harder to hit by non-natives; non-natives striking out lose 1 skill; each bramble a non-native rangestrikes across costs 1 skill. <i>Sand</i> — slows non-natives. <i>Drift</i> — slows non-natives, and a non-native takes 1 hit at the start of each strike phase there. <i>Slope</i> — slows non-natives climbing; natives add a die striking down; non-natives lose 1 skill striking up. <i>Tower wall</i> — slows anyone climbing; striking down gains 1 skill, striking up loses 1. Rangestrikes are blocked by trees and by creatures in between (except a Warlock's). Defenders may reinforce on turn 4; the attacker may summon one Angel per battle.</p>
   <p><b>Scoring.</b> Win a battle to score the loser's full value (power × skill of each creature). Every 100 points earns an Angel, and every 500 an Archangel. Your Titan's power is 6 + 1 per 100 points. If your Titan dies, you're out.</p>
   <table style="font-size:13px;border-collapse:collapse;width:100%">${Object.entries(TREES).map(([t,tr])=>`<tr><td style="padding:2px 6px 2px 0"><b>${t}</b></td><td>${tr.map(([c,n],i)=>(i?` →${n?n+'× ':''} `:'')+c).join('')}</td></tr>`).join('')}</table>
   </div></details>`;
