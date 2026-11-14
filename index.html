@@ -121,6 +121,7 @@ svg .hl{animation:pulse 1.2s ease-in-out infinite}
     <h1>TITAN</h1><span class="sub">a fan-made web edition</span><span class="sp"></span>
     <span id="hdrInfo" class="cinzel" style="font-size:13px"></span>
     <button class="alt" id="btnSaveFile" style="display:none" title="Download this game as a save file">💾 Save file</button>
+    <button class="alt" id="btnSound"></button>
     <button class="alt" id="btnCharts">📜 Charts</button>
     <button class="alt" id="btnLobby" style="display:none">Lobby</button>
   </header>
@@ -1218,7 +1219,35 @@ function pickModal(title,items,cb,note=''){
 }
 
 /* ================= RENDER: GAME ================= */
+/* ================= TURN CHIME ================= */
+// A short two-note chime, made by the browser (no audio files), when it becomes this player's turn to act.
+let AC=null,soundOn=true,lastTurnKey,chimeCount=0,titleBase=document.title;
+try{soundOn=localStorage.getItem('titan-sound')!=='off'}catch(e){}
+function unlockAudio(){try{if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(C)AC=new C()}if(AC&&AC.state==='suspended')AC.resume()}catch(e){}}
+document.addEventListener('pointerdown',unlockAudio,true);document.addEventListener('keydown',unlockAudio,true);
+function playChime(){
+  chimeCount++;
+  if(!soundOn||!AC)return;
+  try{if(AC.state==='suspended')AC.resume();const t=AC.currentTime;
+    [[659.25,0],[987.77,.16]].forEach(([f,d])=>{const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t+d);g.gain.linearRampToValueAtTime(.22,t+d+.02);g.gain.exponentialRampToValueAtTime(.001,t+d+.7);
+      o.connect(g);g.connect(AC.destination);o.start(t+d);o.stop(t+d+.75)})}catch(e){}
+}
+function soundButton(){const b=document.getElementById('btnSound');if(b){b.textContent=soundOn?'🔔 Sound on':'🔕 Sound off';b.title=soundOn?'A chime plays when it is your turn. Click to mute.':'Turn chime is muted. Click to turn it on.'}}
+// called on every render: chime when the acting player changes to one of this player's seats
+function turnChime(){
+  if(mode!=='game'||!S){lastTurnKey=undefined;document.title=titleBase;return}
+  const a=S.status==='play'?actor(S):null,key=a!=null&&mySeats().includes(a)?'seat'+a:'none';
+  const first=lastTurnKey===undefined;
+  if(first)lastTurnKey=S.status==='lobby'?'none':key;      // joining a game already under way: no chime
+  else if(key!==lastTurnKey){lastTurnKey=key;if(key!=='none')playChime()}
+  document.title=(key!=='none'&&!local&&document.hidden?'● Your turn — ':'')+titleBase;
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.title=titleBase});
+$('#btnSound').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('titan-sound',soundOn?'on':'off')}catch(e){}soundButton();if(soundOn){unlockAudio();playChime();chimeCount--}};
+soundButton();
 function render(){
+  turnChime();
   if(mode==='lobby'){renderLobby();return}
   $('#btnLobby').style.display='';$('#btnSaveFile').style.display=S&&S.status!=='lobby'?'':'none';
   if(!S){$('#main').innerHTML=`<div class="lobby parch"><h2>Joining room ${esc(room||'')}…</h2><p id="netStat" class="muted">${netStatHTML()}</p>
